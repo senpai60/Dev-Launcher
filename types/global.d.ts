@@ -33,6 +33,18 @@ declare global {
   type GitHubRepository = IntegrationTypes.GitHubRepository;
   type EnvironmentProfile = IntegrationTypes.EnvironmentProfile;
   type AppMetadata = IntegrationTypes.AppMetadata;
+
+  interface Window {
+    api: {
+      projectAPI: {
+        getAll: () => Promise<Project[]>;
+        get: (id: string) => Promise<Project>;
+        add: (project: Project) => Promise<void>;
+        update: (id: string, data: Partial<Project>) => Promise<void>;
+        delete: (id: string) => Promise<void>;
+      };
+    };
+  }
 }
 
 export {};

@@ -1,4 +1,5 @@
 import { readProjects, writeProjects } from "../storage/project.storage";
+import { generateId } from "../utils/idGenerator";
 import {
   openInExplorer,
   openInVsCode,
@@ -16,13 +17,28 @@ export function getProject(id: string): Project | undefined {
   return projects.find((project) => project.id === id);
 }
 
-export function addProject(project: Project): Project {
+export function addProject(
+  projectData: Omit<Project, "id" | "createdAt" | "updatedAt"> & {
+    id?: string;
+    createdAt?: number;
+    updatedAt?: number;
+  }
+): Project {
   const projects = readProjects();
 
-  projects.push(project);
+  const newProject: Project = {
+    ...projectData,
+    id: projectData.id || generateId("proj"),
+    tags: projectData.tags || [],
+    isFavorite: projectData.isFavorite ?? false,
+    createdAt: projectData.createdAt || Date.now(),
+    updatedAt: projectData.updatedAt || Date.now(),
+  };
+
+  projects.push(newProject);
   writeProjects(projects);
 
-  return project;
+  return newProject;
 }
 
 export function updateProject(
@@ -40,6 +56,7 @@ export function updateProject(
   const updatedProject = {
     ...projects[index],
     ...updates,
+    updatedAt: Date.now(),
   };
 
   projects[index] = updatedProject;
@@ -73,6 +90,9 @@ export function launchProject(
     if (cb) cb(new Error("Project not found"), null);
     return;
   }
+
+  // Phase 2: Automatically update lastOpenedAt timestamp on launch
+  updateProject(id, { lastOpenedAt: Date.now() });
 
   try {
     const projectPath = project.path;

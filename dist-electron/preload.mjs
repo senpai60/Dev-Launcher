@@ -1,13 +1,1 @@
-"use strict";
-const electron = require("electron");
-const projectAPI = {
-  getAll: () => electron.ipcRenderer.invoke("projects:getAll"),
-  get: (id) => electron.ipcRenderer.invoke("projects:get", id),
-  add: (project) => electron.ipcRenderer.invoke("projects:add", project),
-  update: (id, data) => electron.ipcRenderer.invoke("projects:update", id, data),
-  delete: (id) => electron.ipcRenderer.invoke("projects:delete", id),
-  launch: (id, action) => electron.ipcRenderer.invoke("projects:launch", id, action)
-};
-electron.contextBridge.exposeInMainWorld("api", {
-  projectAPI
-});
+"use strict";const r=require("electron"),o={getAll:()=>r.ipcRenderer.invoke("projects:getAll"),get:e=>r.ipcRenderer.invoke("projects:get",e),add:e=>r.ipcRenderer.invoke("projects:add",e),update:(e,n)=>r.ipcRenderer.invoke("projects:update",e,n),delete:e=>r.ipcRenderer.invoke("projects:delete",e),launch:(e,n)=>r.ipcRenderer.invoke("projects:launch",e,n)},t={getAll:()=>r.ipcRenderer.invoke("groups:getAll"),get:e=>r.ipcRenderer.invoke("groups:get",e),add:e=>r.ipcRenderer.invoke("groups:add",e),update:(e,n)=>r.ipcRenderer.invoke("groups:update",e,n),delete:e=>r.ipcRenderer.invoke("groups:delete",e)};r.contextBridge.exposeInMainWorld("api",{projectAPI:o,groupAPI:t});

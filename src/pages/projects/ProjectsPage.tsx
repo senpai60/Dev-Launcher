@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   Search,
   Code2,
@@ -24,10 +25,16 @@ import Checkbox from "../../components/ui/Form/Checkbox";
 import TagInput from "../../components/ui/Form/TagInput";
 import FolderPicker from "../../components/ui/Form/FolderPicker";
 import { useProjectContext } from "../../context/ProjectContext";
+import { useGroupContext } from "../../context/GroupContext";
 import { Project } from "../../../types/project";
 import "./projects.css";
 
 const ProjectsPage: React.FC = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const filterParam = searchParams.get("filter") || "all";
+  const groupParam = searchParams.get("group") || "";
+  const actionParam = searchParams.get("action") || "";
+
   const [searchQuery, setSearchQuery] = useState("");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
 
@@ -36,6 +43,7 @@ const ProjectsPage: React.FC = () => {
   const [formPath, setFormPath] = useState("");
   const [formDescription, setFormDescription] = useState("");
   const [formTags, setFormTags] = useState<string[]>(["React", "Node.js"]);
+  const [formGroupId, setFormGroupId] = useState("");
   const [formIsFavorite, setFormIsFavorite] = useState(false);
   const [formError, setFormError] = useState("");
 
@@ -47,12 +55,46 @@ const ProjectsPage: React.FC = () => {
   const editProject = projectContext?.editProject;
   const openProject = projectContext?.openProject;
 
+  const groupCtx = useGroupContext();
+  const groups = groupCtx?.groups;
+  const loadGroups = groupCtx?.loadGroups;
+
   useEffect(() => {
     loadAllProjects?.();
+    loadGroups?.();
   }, []);
 
+  useEffect(() => {
+    if (actionParam === "create") {
+      openCreateDialog();
+      // Clear action param after opening
+      searchParams.delete("action");
+      setSearchParams(searchParams, { replace: true });
+    }
+  }, [actionParam]);
+
+  // Filter & sort projects according to Phase 2 specs
+  let sourceProjects = (allProjects || []).slice();
+
+  if (filterParam === "favorites") {
+    sourceProjects = sourceProjects.filter((p) => p.isFavorite);
+  } else if (filterParam === "recent") {
+    sourceProjects = sourceProjects.sort(
+      (a, b) => (b.lastOpenedAt || b.updatedAt) - (a.lastOpenedAt || a.updatedAt)
+    );
+  } else if (groupParam) {
+    sourceProjects = sourceProjects.filter((p) => p.groupId === groupParam);
+  } else {
+    // All projects mode: favorites sorted first, then by last opened / updated date
+    sourceProjects = sourceProjects.sort((a, b) => {
+      if (a.isFavorite && !b.isFavorite) return -1;
+      if (!a.isFavorite && b.isFavorite) return 1;
+      return (b.lastOpenedAt || b.updatedAt) - (a.lastOpenedAt || a.updatedAt);
+    });
+  }
+
   // Map real projects from context
-  const projects: ProjectCardData[] = (allProjects || []).map((p) => ({
+  const projects: ProjectCardData[] = sourceProjects.map((p) => ({
     id: p.id,
     name: p.name,
     tech: p.tags && p.tags.length > 0 ? p.tags.join(" · ") : p.description || "No tech stack",
@@ -65,6 +107,7 @@ const ProjectsPage: React.FC = () => {
     setFormPath("");
     setFormDescription("");
     setFormTags(["React", "Express", "Node.js"]);
+    setFormGroupId(groupParam || "");
     setFormIsFavorite(false);
     setFormError("");
     setIsCreateOpen(true);
@@ -81,19 +124,17 @@ const ProjectsPage: React.FC = () => {
       return;
     }
 
-    const newProject: Project = {
-      id: Date.now().toString(),
+    const newProjectData: Partial<Project> = {
       name: formName.trim(),
       path: formPath.trim(),
       description: formDescription.trim(),
       tags: formTags,
+      groupId: formGroupId || undefined,
       isFavorite: formIsFavorite,
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
     };
 
     if (createProject) {
-      await createProject(newProject);
+      await createProject(newProjectData);
     }
     setIsCreateOpen(false);
   };
@@ -171,9 +212,19 @@ const ProjectsPage: React.FC = () => {
     },
   ];
 
+  const activeGroup = (groups || []).find((g) => g.id === groupParam);
+
+  const getPageTitle = () => {
+    if (filterParam === "favorites") return "Projects / Favorites";
+    if (filterParam === "recent") return "Projects / Recent";
+    if (activeGroup) return `Projects / ${activeGroup.name}`;
+    if (groupParam) return `Projects / ${groupParam.replace("group_", "").toUpperCase()}`;
+    return "Projects / All Projects";
+  };
+
   return (
     <section className="projects-page">
-      <PageNavbar title="Projects / All Projects">
+      <PageNavbar title={getPageTitle()}>
         <button
           className="action-btn text-button"
           style={{ padding: "var(--space-2) var(--space-4)", textAlign: "center" }}
@@ -200,9 +251,19 @@ const ProjectsPage: React.FC = () => {
         {filteredProjects.length === 0 ? (
           <EmptyState
             icon={<FolderOpen size={32} strokeWidth={1.5} />}
-            title="No projects yet"
-            description="Add your first project to start managing your workspace."
-            actionLabel="Add Project"
+            title={
+              activeGroup
+                ? `No projects in ${activeGroup.name}`
+                : filterParam === "favorites"
+                ? "No favorite projects"
+                : "No projects yet"
+            }
+            description={
+              filterParam === "favorites"
+                ? "Star projects to add them to your favorites list."
+                : "Add your first project to start managing your workspace."
+            }
+            actionLabel={activeGroup ? `Add Project to ${activeGroup.name}` : "Add Project"}
             onAction={openCreateDialog}
           />
         ) : (
@@ -270,6 +331,23 @@ const ProjectsPage: React.FC = () => {
             error={formError && !formName ? formError : undefined}
             required
           />
+
+          {/* Group / Collection Dropdown */}
+          <div className="form-field">
+            <label className="form-label">Collection / Group (Optional)</label>
+            <select
+              className="form-input"
+              value={formGroupId}
+              onChange={(e) => setFormGroupId(e.target.value)}
+            >
+              <option value="">No Group (Unassigned)</option>
+              {(groups || []).map((g) => (
+                <option key={g.id} value={g.id}>
+                  {g.name}
+                </option>
+              ))}
+            </select>
+          </div>
 
           <TagInput
             label="Tech Stack / Tags"

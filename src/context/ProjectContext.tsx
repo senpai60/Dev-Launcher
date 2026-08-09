@@ -1,11 +1,13 @@
 import React, { createContext, useContext, useState } from "react";
 import { useProjectAPI } from "../api/api";
+import { Project } from "../../types/project";
+
 const ProjectContext = createContext<ProjectContextValue | null>(null);
 
 type ProjectContextValue = {
   project: Project | null;
   allProjects: Project[] | null;
-  createProject: (project: Project) => Promise<void>;
+  createProject: (projectData: Partial<Project>) => Promise<Project>;
   deleteProjectItem: (id: string) => Promise<void>;
   editProject: (id: string, data: Partial<Project>) => Promise<void>;
   loadAllProjects: () => Promise<void>;
@@ -30,11 +32,10 @@ export const ProjectContextProvider = ({
     launchProject,
   } = useProjectAPI();
 
-  // hooks
-
-  const createProject = async (project: Project) => {
-    await addProject(project);
-    setAllProjects((prev) => (prev ? [...prev, project] : [project]));
+  const createProject = async (projectData: Partial<Project>): Promise<Project> => {
+    const created = await addProject(projectData);
+    setAllProjects((prev) => (prev ? [...prev, created] : [created]));
+    return created;
   };
 
   const deleteProjectItem = async (id: string) => {
@@ -55,12 +56,19 @@ export const ProjectContextProvider = ({
   };
 
   const loadProject = async (id: string) => {
-    const project = await getProject(id);
-    setProject(project);
+    const projectItem = await getProject(id);
+    setProject(projectItem);
   };
 
   const openProject = async (id: string, action: string) => {
     await launchProject(id, action);
+    const now = Date.now();
+    await updateProject(id, { lastOpenedAt: now });
+    setAllProjects((prev) =>
+      prev
+        ? prev.map((p) => (p.id === id ? { ...p, lastOpenedAt: now } : p))
+        : null
+    );
   };
 
   const value: ProjectContextValue = {

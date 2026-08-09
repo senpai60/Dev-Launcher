@@ -6,6 +6,7 @@ import WorkspacesPage from "./pages/workspaces/WorkspacesPage";
 import CommandsPage from "./pages/commands/CommandsPage";
 import GitPage from "./pages/git/GitPage";
 import DockerPage from "./pages/docker/DockerPage";
+import AppsPage from "./pages/apps/AppsPage";
 import Aside from "./components/layout/Aside/Aside";
 
 const App = () => {
@@ -16,6 +17,7 @@ const App = () => {
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/projects" element={<ProjectsPage />} />
+          <Route path="/apps" element={<AppsPage />} />
           <Route path="/workspaces" element={<WorkspacesPage />} />
           <Route path="/commands" element={<CommandsPage />} />
           <Route path="/git" element={<GitPage />} />

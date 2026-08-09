@@ -6,6 +6,7 @@ export interface FolderPickerProps {
   label?: string;
   value: string;
   onChange: (path: string, folderName?: string) => void;
+  placeholder?: string;
   error?: string;
   className?: string;
 }
@@ -14,6 +15,7 @@ export const FolderPicker: React.FC<FolderPickerProps> = ({
   label = "Project Location",
   value,
   onChange,
+  placeholder = "Select Project Folder...",
   error,
   className = "",
 }) => {
@@ -73,7 +75,7 @@ export const FolderPicker: React.FC<FolderPickerProps> = ({
             onClick={handleBrowseClick}
           >
             <FolderOpen size={18} />
-            <span>Select Project Folder...</span>
+            <span>{placeholder}</span>
           </button>
         )}
 

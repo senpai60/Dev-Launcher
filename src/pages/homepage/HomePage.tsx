@@ -17,7 +17,14 @@ const HomePage = () => {
     loadAllProjects?.();
   }, []);
 
-  const heroProject = allProjects && allProjects.length > 0 ? allProjects[0] : null;
+  // Phase 2: Derive recently opened projects sorted by lastOpenedAt / updatedAt
+  const recentProjects = (allProjects || []).slice().sort((a, b) => {
+    const timeA = a.lastOpenedAt || a.updatedAt || 0;
+    const timeB = b.lastOpenedAt || b.updatedAt || 0;
+    return timeB - timeA;
+  });
+
+  const heroProject = recentProjects.length > 0 ? recentProjects[0] : null;
 
   const handleLaunch = (action: string, id?: string) => {
     const targetId = id || heroProject?.id;
@@ -27,6 +34,8 @@ const HomePage = () => {
       console.log(`Launching action: ${action} for project: ${targetId || 'demo'}`);
     }
   };
+
+  const favoritesCount = (allProjects || []).filter((p) => p.isFavorite).length;
 
   return (
     <section className="home-dashboard">
@@ -44,8 +53,16 @@ const HomePage = () => {
           <div className="continue-card">
             <div className="card-info">
               <h3 className="text-project-name">{heroProject ? heroProject.name : "BrutDesk"}</h3>
-              <p className="text-project-desc">{heroProject ? (heroProject.tags?.join(" · ") || heroProject.path) : "React + Express"}</p>
-              <p className="text-meta" style={{ marginTop: 'var(--space-2)' }}>Opened 4 min ago</p>
+              <p className="text-project-desc">
+                {heroProject
+                  ? (heroProject.tags?.length ? heroProject.tags.join(" · ") : heroProject.path)
+                  : "React + Express"}
+              </p>
+              <p className="text-meta" style={{ marginTop: 'var(--space-2)' }}>
+                {heroProject?.lastOpenedAt
+                  ? `Opened ${new Date(heroProject.lastOpenedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+                  : "Opened 4 min ago"}
+              </p>
             </div>
             <div className="card-actions">
               <button
@@ -95,8 +112,8 @@ const HomePage = () => {
           <div className="dashboard-section recent-projects">
             <h2 className="text-section-title">Recent Projects</h2>
             <ul className="project-list">
-              {(allProjects && allProjects.length > 0
-                ? allProjects.slice(0, 4)
+              {(recentProjects.length > 0
+                ? recentProjects.slice(0, 4)
                 : [
                     { id: "1", name: "BrutDesk" },
                     { id: "2", name: "Gym Website" },
@@ -108,6 +125,7 @@ const HomePage = () => {
                   key={p.id}
                   className="project-item"
                   onClick={() => handleLaunch("vscode", p.id)}
+                  style={{ cursor: "pointer" }}
                 >
                   <span className="text-recent-project">{p.name}</span>
                 </li>
@@ -149,7 +167,7 @@ const HomePage = () => {
                 <p className="text-stat-label">Projects</p>
               </div>
               <div className="stat-card">
-                <h3 className="text-stat-number">{allProjects ? allProjects.filter(p => p.isFavorite).length : 4}</h3>
+                <h3 className="text-stat-number">{allProjects ? favoritesCount : 4}</h3>
                 <p className="text-stat-label">Favorites</p>
               </div>
               <div className="stat-card">

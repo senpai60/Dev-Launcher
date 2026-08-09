@@ -1,4 +1,5 @@
 import type * as ProjectTypes from './project';
+import type * as GroupTypes from './group';
 import type * as WorkspaceTypes from './workspace';
 import type * as SettingsTypes from './settings';
 import type * as HistoryTypes from './history';
@@ -8,7 +9,7 @@ import type * as IntegrationTypes from './integration';
 declare global {
   type Project = ProjectTypes.Project;
   type ProjectMetadata = ProjectTypes.ProjectMetadata;
-  type ProjectGroup = ProjectTypes.ProjectGroup;
+  type ProjectGroup = GroupTypes.ProjectGroup;
   type ProjectCommand = ProjectTypes.ProjectCommand;
   type ProjectUrl = ProjectTypes.ProjectUrl;
   type ProjectNote = ProjectTypes.ProjectNote;
@@ -39,10 +40,17 @@ declare global {
       projectAPI: {
         getAll: () => Promise<Project[]>;
         get: (id: string) => Promise<Project>;
-        add: (project: Project) => Promise<void>;
+        add: (project: Partial<Project>) => Promise<Project>;
         update: (id: string, data: Partial<Project>) => Promise<void>;
         delete: (id: string) => Promise<void>;
         launch: (id: string, action: string) => Promise<void>;
+      };
+      groupAPI: {
+        getAll: () => Promise<ProjectGroup[]>;
+        get: (id: string) => Promise<ProjectGroup>;
+        add: (group: Partial<ProjectGroup>) => Promise<ProjectGroup>;
+        update: (id: string, data: Partial<ProjectGroup>) => Promise<void>;
+        delete: (id: string) => Promise<void>;
       };
     };
   }

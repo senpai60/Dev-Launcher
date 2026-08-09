@@ -81,16 +81,41 @@ aside.aside-container {
   margin: 0;
 }
 
-.secondary-divider-title {
+.groups-header-container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: var(--space-4);
+  margin-bottom: var(--space-2);
+  padding-left: var(--space-2);
+  padding-right: var(--space-2);
+  border-top: 1px solid var(--bg-tirtiary);
+  padding-top: var(--space-3);
+}
+
+.groups-header-title {
   color: var(--text-secondary);
   font-size: var(--text-sm);
   font-weight: var(--font-semibold);
   font-family: var(--font-ui);
-  margin-top: var(--space-4);
-  margin-bottom: var(--space-2);
-  padding-left: var(--space-2);
-  border-top: 1px solid var(--bg-tirtiary);
-  padding-top: var(--space-3);
+}
+
+.add-group-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.add-group-btn:hover {
+  background-color: var(--button-inside);
+  color: var(--text-primary);
 }
 
 .secondary-nav-item {
@@ -119,4 +144,36 @@ aside.aside-container {
   background-color: var(--button-inside);
   color: var(--text-primary);
   font-weight: var(--font-medium);
+}
+
+/* Existing Projects Checklist in Group Modal */
+.existing-projects-checklist {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  max-height: 180px;
+  overflow-y: auto;
+  background-color: var(--bg-primary);
+  border: 1px solid var(--bg-tirtiary);
+  border-radius: 8px;
+  padding: 6px;
+  margin-top: 6px;
+}
+
+.project-check-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.project-check-item:hover {
+  background-color: var(--card-surface);
+}
+
+.project-check-item.selected {
+  background-color: var(--button-inside);
 }

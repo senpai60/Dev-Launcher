@@ -3,9 +3,9 @@ import { useNavigate } from "react-router-dom";
 const HomePage = () => {
   const navigate = useNavigate();
   return (
-    <div>
-      <h1>HomePage</h1>
-    </div>
+    <section>
+      <h1 className="text-heading">Dev Launcher</h1>
+    </section>
   );
 };
 

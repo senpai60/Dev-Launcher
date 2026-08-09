@@ -1,7 +1,8 @@
 :root {
-  --bg-primary: #1d1d1d;
+  /* Neutral Color Palette (80-90% Neutral Grayscale) */
+  --bg-primary: #181818;
   --bg-secordary: #222222;
-  --bg-tirtiary: #2f2f2f;
+  --bg-tirtiary: #2a2a2a;
   --bg-quaternary: #ffffff;
 
   --card-surface: var(--bg-secordary);
@@ -10,16 +11,45 @@
   --button-inside: var(--bg-tirtiary);
   --button-ghost: #2b2b2b;
 
-  --text-primary: var(--bg-quaternary);
-  --text-secondary: #a0a0a0;
+  /* Neutral Typography Hierarchy */
+  --text-primary: #f2f2f2;   /* Level 1: Near-white primary text */
+  --text-secondary: #a0a0a0; /* Level 2 & 3: Neutral secondary gray */
+  --text-tertiary: #707070;  /* Level 4: Metadata muted gray */
+  --text-disabled: #555555;  /* Disabled text */
 
-  /* Accents (Claude-style) */
+  /* Accents (Controlled & Sparse - Active/Hover states only) */
   --accent-primary: #d97757;
   --accent-hover: #c46445;
   --accent-surface: rgba(217, 119, 87, 0.15);
 
   --text-accent: var(--accent-primary);
-  --text-tertiary: #6b6b6b;
+
+  /* Typography Font Families */
+  --font-ui: "Inter", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+
+  /* Typography Size Tokens */
+  --text-xs: 11px;
+  --text-sm: 12px;
+  --text-base: 13px;
+  --text-md: 14px;
+  --text-lg: 19px;
+  --text-xl: 20px;
+  --text-2xl: 24px;
+
+  /* Typography Weight Tokens */
+  --font-regular: 400;
+  --font-medium: 500;
+  --font-semibold: 600;
+
+  /* Typography Line Heights */
+  --lh-tight: 1.25;
+  --lh-ui: 1.4;
+  --lh-mono: 1.5;
+
+  /* Typography Letter Spacing */
+  --ls-ui: -0.01em;
+  --ls-mono: 0em;
 
   /* Spacing */
   --space-1: 0.25rem; /* 4px */

@@ -21,4 +21,6 @@ main {
 
 section {
   padding: var(--space-4);
+  flex: 1;
+  width: 100%;
 }

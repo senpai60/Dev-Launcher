@@ -1,0 +1,223 @@
+.home-dashboard {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow-y: auto;
+}
+
+.dashboard-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  margin-top: var(--space-4);
+}
+
+.dashboard-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.section-title {
+  color: var(--text-secondary);
+  font-weight: var(--font-semibold);
+  font-size: var(--text-base);
+  text-transform: none;
+  letter-spacing: var(--ls-ui);
+}
+
+.dashboard-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-6);
+}
+
+/* Continue Working */
+.continue-card {
+  background-color: var(--card-surface);
+  border: 1px solid var(--bg-tirtiary);
+  border-radius: 12px;
+  padding: var(--space-5);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  transition: all 0.2s ease;
+}
+
+.continue-card:hover {
+  border-color: var(--accent-surface);
+  background-color: var(--bg-tirtiary);
+}
+
+.card-info {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.primary-action-btn {
+  background-color: var(--button-solid);
+  color: var(--bg-primary);
+  border: none;
+  border-radius: 8px;
+  padding: var(--space-3) var(--space-6);
+  cursor: pointer;
+  font-family: var(--font-ui);
+  font-size: var(--text-base);
+  font-weight: var(--font-medium);
+  transition: opacity 0.2s ease;
+}
+
+.primary-action-btn:hover {
+  opacity: 0.9;
+}
+
+.card-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--space-2);
+}
+
+.app-launch-icons {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.icon-btn {
+  background-color: var(--button-inside);
+  color: var(--text-secondary);
+  border: 1px solid var(--bg-tirtiary);
+  border-radius: 6px;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.icon-btn:hover {
+  color: var(--text-primary);
+  background-color: var(--bg-tirtiary);
+  border-color: var(--text-secondary);
+}
+
+.app-icon-img {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+  display: block;
+}
+
+/* Quick Actions Button Styling */
+.action-btn {
+  background-color: var(--card-surface);
+  color: var(--text-primary);
+  border: 1px solid var(--bg-tirtiary);
+  border-radius: 8px;
+  cursor: pointer;
+  font-family: var(--font-ui);
+  font-size: var(--text-base);
+  font-weight: var(--font-medium);
+  transition: all 0.2s ease;
+}
+
+.action-btn:hover {
+  background-color: var(--button-inside);
+  border-color: var(--text-secondary);
+}
+
+/* Recent Projects - Compact & Intentional Vertical Spacing */
+.project-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.project-item {
+  background-color: transparent;
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 1px solid transparent;
+}
+
+.project-item:hover {
+  background-color: var(--card-surface);
+  border-color: var(--bg-tirtiary);
+}
+
+/* Running Processes - Strict Alignment: [Dot] [Name (left, flex:1)] [Port (right)] */
+.process-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.process-item {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: var(--space-3) var(--space-4);
+  background-color: var(--card-surface);
+  border-radius: 8px;
+  border: 1px solid var(--bg-tirtiary);
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: var(--accent-primary);
+  margin-right: var(--space-3);
+  flex-shrink: 0;
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+.process-name {
+  flex: 1;
+  text-align: left;
+  font-family: var(--font-mono);
+  font-size: var(--text-base);
+  font-weight: var(--font-regular);
+  color: var(--text-primary);
+}
+
+.port {
+  text-align: right;
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: var(--text-base);
+  font-weight: var(--font-regular);
+  color: var(--text-secondary);
+}
+
+/* Quick Stats */
+.stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+}
+
+.stat-card {
+  background-color: var(--card-surface);
+  border: 1px solid var(--bg-tirtiary);
+  border-radius: 8px;
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+}

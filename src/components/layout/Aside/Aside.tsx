@@ -1,5 +1,5 @@
 import * as LucideIcons from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import "./aside.css";
 
 type LucideIconKey = {
@@ -32,6 +32,8 @@ const secondaryLinks = [
 
 const Aside = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+
   return (
     <aside className="aside-container">
       {/* PRIMARY SIDEBAR */}
@@ -39,12 +41,13 @@ const Aside = () => {
         <div className="primary-nav-top">
           {primaryLinks.map((navLink) => {
             const Icon = LucideIcons[navLink.icon] as LucideIcons.LucideIcon;
+            const isActive = location.pathname === navLink.to;
             return (
               <div
                 onClick={() => navigate(navLink.to)}
                 key={navLink.to}
                 title={navLink.label}
-                className="primary-nav-item"
+                className={`primary-nav-item ${isActive ? "active" : ""}`}
               >
                 <Icon size={20} strokeWidth={1.5} />
                 <span>{navLink.label}</span>
@@ -54,7 +57,7 @@ const Aside = () => {
         </div>
         <div className="primary-nav-bottom">
           <div
-            className="primary-nav-item"
+            className={`primary-nav-item ${location.pathname === "/settings" ? "active" : ""}`}
             onClick={() => navigate("/settings")}
             title="Settings"
           >
@@ -68,8 +71,8 @@ const Aside = () => {
       <div className="sidebar-secondary">
         <h2>Projects</h2>
         <ul className="secondary-nav">
-          {secondaryLinks.map((link) => (
-            <li key={link.label} className="secondary-nav-item">
+          {secondaryLinks.map((link, idx) => (
+            <li key={link.label} className={`secondary-nav-item ${idx === 0 ? "active" : ""}`}>
               {link.label}
             </li>
           ))}

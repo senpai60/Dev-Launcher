@@ -1,4 +1,3 @@
-import { Project } from "../types/project.type";
 import { readProjects, writeProjects } from "../storage/project.storage";
 
 export function getProjects(): Project[] {

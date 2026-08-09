@@ -1,5 +1,4 @@
 import { ipcRenderer } from "electron";
-import { Project } from "../types/project.type";
 
 export const projectAPI = {
   getAll: () => ipcRenderer.invoke("projects:getAll"),

@@ -1,4 +1,4 @@
-export {}; // Make it a module so we can augment the global scope
+export {};
 
 declare global {
   type Project = {

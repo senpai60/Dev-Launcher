@@ -1,0 +1,217 @@
+/* Form Layout & Fields */
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+
+.form-label {
+  font-family: var(--font-ui);
+  font-size: var(--text-base);
+  font-weight: var(--font-medium);
+  color: var(--text-secondary);
+}
+
+.form-input {
+  width: 100%;
+  background-color: var(--bg-primary);
+  border: 1px solid var(--bg-tirtiary);
+  border-radius: 8px;
+  padding: 10px 12px;
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: var(--text-base);
+  outline: none;
+  transition: border-color 0.2s ease;
+}
+
+.form-input.is-mono {
+  font-family: var(--font-mono);
+}
+
+.form-input::placeholder {
+  color: var(--text-tertiary);
+}
+
+.form-input:focus {
+  border-color: var(--text-secondary);
+}
+
+.form-error {
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  color: #ef4444;
+  margin-top: 2px;
+}
+
+/* Custom Checkbox */
+.checkbox-field {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  cursor: pointer;
+  user-select: none;
+  margin-bottom: var(--space-4);
+}
+
+.checkbox-custom {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  background-color: var(--bg-primary);
+  border: 1px solid var(--bg-tirtiary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--bg-primary);
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.checkbox-field.checked .checkbox-custom {
+  background-color: var(--button-solid);
+  border-color: var(--button-solid);
+  color: var(--bg-primary);
+}
+
+.checkbox-label {
+  font-family: var(--font-ui);
+  font-size: var(--text-base);
+  font-weight: var(--font-regular);
+  color: var(--text-primary);
+}
+
+/* Tag / Array Input */
+.tag-input-container {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  background-color: var(--bg-primary);
+  border: 1px solid var(--bg-tirtiary);
+  border-radius: 8px;
+  padding: 8px 10px;
+  min-height: 44px;
+  transition: border-color 0.2s ease;
+}
+
+.tag-input-container:focus-within {
+  border-color: var(--text-secondary);
+}
+
+.tag-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background-color: var(--bg-tirtiary);
+  color: var(--text-primary);
+  border-radius: 4px;
+  padding: 3px 8px;
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+}
+
+.tag-remove-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s ease;
+}
+
+.tag-remove-btn:hover {
+  color: var(--text-primary);
+}
+
+.tag-text-input {
+  flex: 1;
+  min-width: 120px;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: var(--text-base);
+}
+
+.tag-text-input::placeholder {
+  color: var(--text-tertiary);
+}
+
+/* Folder Picker Component */
+.folder-picker-box {
+  width: 100%;
+}
+
+.folder-select-btn {
+  width: 100%;
+  background-color: var(--bg-primary);
+  border: 1px dashed var(--bg-tirtiary);
+  border-radius: 8px;
+  padding: var(--space-4);
+  color: var(--text-secondary);
+  font-family: var(--font-ui);
+  font-size: var(--text-base);
+  font-weight: var(--font-medium);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  transition: all 0.2s ease;
+}
+
+.folder-select-btn:hover {
+  border-color: var(--text-secondary);
+  color: var(--text-primary);
+  background-color: var(--card-surface);
+}
+
+.folder-selected-display {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  background-color: var(--bg-primary);
+  border: 1px solid var(--bg-tirtiary);
+  border-radius: 8px;
+  padding: 8px 12px;
+  width: 100%;
+}
+
+.folder-icon {
+  color: var(--accent-primary);
+  flex-shrink: 0;
+}
+
+.folder-path-text {
+  flex: 1;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+  word-break: break-all;
+}
+
+.folder-change-btn {
+  background-color: var(--button-inside);
+  color: var(--text-secondary);
+  border: 1px solid var(--bg-tirtiary);
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+}
+
+.folder-change-btn:hover {
+  color: var(--text-primary);
+  border-color: var(--text-secondary);
+}

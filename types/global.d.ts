@@ -147,6 +147,13 @@ declare global {
           callback: (progress: SessionTypes.ResumeProgress) => void,
         ) => () => void;
       };
+      overlayAPI: {
+        hide: () => Promise<boolean>;
+        getShortcut: () => Promise<string | null>;
+        focusMain: (route?: string) => Promise<boolean>;
+        onShown: (callback: () => void) => () => void;
+        onNavigate: (callback: (route: string) => void) => () => void;
+      };
     };
   }
 }

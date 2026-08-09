@@ -6,6 +6,8 @@ import { registerGroupIPC } from "./ipc/group.ipc";
 import { registerDialogIPC } from "./ipc/dialog.ipc";
 import { registerToolsIPC } from "./ipc/tools.ipc";
 import { registerSessionIPC } from "./ipc/session.ipc";
+import { registerOverlayIPC } from "./ipc/overlay.ipc";
+import { initOverlay, teardownOverlay } from "./windows/overlay";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -83,6 +85,9 @@ app.on("window-all-closed", () => {
   }
 });
 
+// Release the global accelerator and let the overlay actually close.
+app.on("will-quit", teardownOverlay);
+
 app.on("activate", () => {
   if (BrowserWindow.getAllWindows().length === 0) {
     createWindow();
@@ -97,5 +102,14 @@ app.whenReady().then(() => {
   registerDialogIPC();
   registerToolsIPC();
   registerSessionIPC();
+  registerOverlayIPC(() => win);
   createWindow();
+
+  // The overlay reuses the main bundle through the #/overlay hash route, so it
+  // is created hidden at startup and simply shown when the shortcut fires.
+  initOverlay({
+    preloadPath: path.join(__dirname, "preload.mjs"),
+    devServerUrl: VITE_DEV_SERVER_URL,
+    rendererDist: RENDERER_DIST,
+  });
 });

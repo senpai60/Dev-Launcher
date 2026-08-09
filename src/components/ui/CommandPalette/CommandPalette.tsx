@@ -22,6 +22,7 @@ import {
   Search,
   Settings,
   Wrench,
+  Zap,
 } from "lucide-react";
 import { useProjectContext } from "../../../context/ProjectContext";
 import { useSessionAPI } from "../../../api/api";
@@ -190,6 +191,18 @@ export const CommandPalette: React.FC = () => {
       },
     });
 
+    list.push({
+      id: "action_instant_generator",
+      title: "⚡ Instant Project Generator",
+      subtitle: "Scaffold React, Next.js, Express, Electron, or FastAPI from a template",
+      category: "Quick Actions",
+      keywords: "create new project scaffold template react nextjs vite express fastapi electron generate",
+      icon: <Zap size={18} />,
+      action: () => {
+        close();
+        navigate("/projects?action=generate");
+      },
+    });
     // Previously these targeted `allProjects[0]`, which opened an arbitrary
     // project. They now route to the list so the user picks one.
     list.push({

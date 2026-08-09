@@ -7,6 +7,7 @@ import { registerDialogIPC } from "./ipc/dialog.ipc";
 import { registerToolsIPC } from "./ipc/tools.ipc";
 import { registerSessionIPC } from "./ipc/session.ipc";
 import { registerOverlayIPC } from "./ipc/overlay.ipc";
+import { registerGeneratorIPC } from "./ipc/generator.ipc";
 import { initOverlay, teardownOverlay } from "./windows/overlay";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -103,6 +104,7 @@ app.whenReady().then(() => {
   registerToolsIPC();
   registerSessionIPC();
   registerOverlayIPC(() => win);
+  registerGeneratorIPC();
   createWindow();
 
   // The overlay reuses the main bundle through the #/overlay hash route, so it

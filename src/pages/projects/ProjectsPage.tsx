@@ -27,6 +27,7 @@ import ConfirmDialog from "../../components/ui/ConfirmDialog/ConfirmDialog";
 import CommandRow from "../../components/ui/Command/CommandRow";
 import CommandFormDialog from "../../components/ui/Command/CommandFormDialog";
 import SessionPanel from "../../components/ui/Session/SessionPanel";
+import ProjectGeneratorModal from "../../components/ui/ProjectGenerator/ProjectGeneratorModal";
 import Input from "../../components/ui/Form/Input";
 import Checkbox from "../../components/ui/Form/Checkbox";
 import TagInput from "../../components/ui/Form/TagInput";
@@ -67,6 +68,7 @@ const ProjectsPage: React.FC = () => {
 
   // Create / edit project dialog
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isGeneratorOpen, setIsGeneratorOpen] = useState(false);
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [formError, setFormError] = useState("");
@@ -131,6 +133,11 @@ const ProjectsPage: React.FC = () => {
   useEffect(() => {
     if (actionParam === "create") {
       openCreateDialog();
+      searchParams.delete("action");
+      setSearchParams(searchParams, { replace: true });
+    }
+    if (actionParam === "generate") {
+      setIsGeneratorOpen(true);
       searchParams.delete("action");
       setSearchParams(searchParams, { replace: true });
     }
@@ -418,6 +425,14 @@ const ProjectsPage: React.FC = () => {
   return (
     <section className="projects-page">
       <PageNavbar title={getPageTitle()}>
+        <button
+          className="action-btn text-button"
+          style={{ padding: "var(--space-2) var(--space-4)", textAlign: "center", display: "flex", alignItems: "center", gap: "6px" }}
+          onClick={() => setIsGeneratorOpen(true)}
+        >
+          <Zap size={13} style={{ color: "var(--accent-primary)" }} />
+          Instant Generator
+        </button>
         <button
           className="action-btn text-button"
           style={{ padding: "var(--space-2) var(--space-4)", textAlign: "center" }}
@@ -736,6 +751,13 @@ const ProjectsPage: React.FC = () => {
           }
           setProjectToDelete(null);
         }}
+      />
+
+      {/* ---- Instant Generator modal ----------------------------------- */}
+      <ProjectGeneratorModal
+        isOpen={isGeneratorOpen}
+        onClose={() => setIsGeneratorOpen(false)}
+        onProjectCreated={() => projectContext?.loadAllProjects()}
       />
 
       {/* ---- Create / edit project ------------------------------------- */}

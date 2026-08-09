@@ -7,6 +7,7 @@ import type * as RuntimeTypes from './runtime';
 import type * as IntegrationTypes from './integration';
 import type * as ToolTypes from './tools';
 import type * as SessionTypes from './session';
+import type * as GeneratorTypes from './generator';
 
 /** Result of validating a command configuration in the main process. */
 export interface CommandValidationResult {
@@ -51,6 +52,15 @@ declare global {
   type GitHubRepository = IntegrationTypes.GitHubRepository;
   type EnvironmentProfile = IntegrationTypes.EnvironmentProfile;
   type AppMetadata = IntegrationTypes.AppMetadata;
+
+  type GeneratorRequest = GeneratorTypes.GeneratorRequest;
+  type GeneratorProgress = GeneratorTypes.GeneratorProgress;
+  type GeneratorResult = GeneratorTypes.GeneratorResult;
+  type TemplateScaffoldDef = GeneratorTypes.TemplateScaffoldDef;
+  type GeneratorStep = GeneratorTypes.GeneratorStep;
+  type GeneratorVariant = GeneratorTypes.GeneratorVariant;
+  type TemplateId = GeneratorTypes.TemplateId;
+  type GeneratorAPI = GeneratorTypes.GeneratorAPI;
 
   interface Window {
     api: {
@@ -154,6 +164,7 @@ declare global {
         onShown: (callback: () => void) => () => void;
         onNavigate: (callback: (route: string) => void) => () => void;
       };
+      generatorAPI: GeneratorTypes.GeneratorAPI;
     };
   }
 }

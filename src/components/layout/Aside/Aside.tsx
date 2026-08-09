@@ -1,5 +1,6 @@
 import * as LucideIcons from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
+import { useState } from "react";
 import "./aside.css";
 
 type LucideIconKey = {
@@ -23,16 +24,23 @@ const primaryLinks: NavLink[] = [
   { to: "/docker", label: "Docker", icon: "Container" },
 ];
 
-const secondaryLinks = [
-  { label: "Favorites" },
-  { label: "Recent" },
-  { label: "All Projects" },
-  { label: "Groups" },
+const secondaryProjectLinks = [
+  { id: "favorites", label: "Favorites", icon: "Star" as LucideIconKey },
+  { id: "recent", label: "Recent", icon: "Clock" as LucideIconKey },
+  { id: "all", label: "All Projects", icon: "Folder" as LucideIconKey },
+];
+
+const groupLinks = [
+  { id: "freelance", label: "Freelance" },
+  { id: "personal", label: "Personal" },
+  { id: "experiments", label: "Experiments" },
+  { id: "learning", label: "Learning" },
 ];
 
 const Aside = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const [activeSecondary, setActiveSecondary] = useState("all");
 
   return (
     <aside className="aside-container">
@@ -71,11 +79,36 @@ const Aside = () => {
       <div className="sidebar-secondary">
         <h2>Projects</h2>
         <ul className="secondary-nav">
-          {secondaryLinks.map((link, idx) => (
-            <li key={link.label} className={`secondary-nav-item ${idx === 0 ? "active" : ""}`}>
-              {link.label}
-            </li>
-          ))}
+          {secondaryProjectLinks.map((link) => {
+            const Icon = LucideIcons[link.icon] as LucideIcons.LucideIcon;
+            const isSel = activeSecondary === link.id;
+            return (
+              <li
+                key={link.id}
+                onClick={() => setActiveSecondary(link.id)}
+                className={`secondary-nav-item ${isSel ? "active" : ""}`}
+              >
+                <Icon size={14} style={{ marginRight: 8, opacity: 0.8 }} />
+                {link.label}
+              </li>
+            );
+          })}
+        </ul>
+
+        <div className="secondary-divider-title">Groups</div>
+        <ul className="secondary-nav">
+          {groupLinks.map((link) => {
+            const isSel = activeSecondary === link.id;
+            return (
+              <li
+                key={link.id}
+                onClick={() => setActiveSecondary(link.id)}
+                className={`secondary-nav-item group-item ${isSel ? "active" : ""}`}
+              >
+                {link.label}
+              </li>
+            );
+          })}
         </ul>
       </div>
     </aside>

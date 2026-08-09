@@ -1,12 +1,15 @@
 import React, { createContext, useContext, useState } from "react";
-
+import { useProjectAPI } from "../api/api";
 const ProjectContext = createContext<ProjectContextValue | null>(null);
 
 type ProjectContextValue = {
   project: Project | null;
-  setProject: React.Dispatch<React.SetStateAction<Project | null>>;
   allProjects: Project[] | null;
-  setAllProjects: React.Dispatch<React.SetStateAction<Project[] | null>>;
+  createProject: (project: Project) => Promise<void>;
+  deleteProjectItem: (id: string) => Promise<void>;
+  editProject: (id: string, data: Partial<Project>) => Promise<void>;
+  loadAllProjects: () => Promise<void>;
+  loadProject: (id: string) => Promise<void>;
 };
 
 export const ProjectContextProvider = ({
@@ -17,15 +20,51 @@ export const ProjectContextProvider = ({
   const [project, setProject] = useState<Project | null>(null);
   const [allProjects, setAllProjects] = useState<Array<Project> | null>(null);
 
+  const {
+    addProject,
+    updateProject,
+    deleteProject,
+    getAllProjects,
+    getProject,
+  } = useProjectAPI();
+
   // hooks
 
-  
+  const createProject = async (project: Project) => {
+    await addProject(project);
+    setAllProjects((prev) => (prev ? [...prev, project] : [project]));
+  };
+
+  const deleteProjectItem = async (id: string) => {
+    await deleteProject(id);
+    setAllProjects((prev) => prev?.filter((p) => p.id !== id) || null);
+  };
+
+  const editProject = async (id: string, data: Partial<Project>) => {
+    await updateProject(id, data);
+    setAllProjects(
+      (prev) => prev?.map((p) => (p.id === id ? { ...p, ...data } : p)) || null,
+    );
+  };
+
+  const loadAllProjects = async () => {
+    const projects = await getAllProjects();
+    setAllProjects(projects);
+  };
+
+  const loadProject = async (id: string) => {
+    const project = await getProject(id);
+    setProject(project);
+  };
 
   const value: ProjectContextValue = {
     allProjects,
-    setAllProjects,
     project,
-    setProject,
+    createProject,
+    deleteProjectItem,
+    editProject,
+    loadAllProjects,
+    loadProject,
   };
 
   return (

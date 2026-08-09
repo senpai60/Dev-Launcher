@@ -8,6 +8,7 @@ import {
   launchProject,
 } from "../services/project.service";
 import { detectProjectMeta } from "../utils/projectDetector";
+import { runCustomCommandInTerminal } from "../integrations/launcher";
 
 export function registerProjectIPC() {
   ipcMain.handle("projects:getAll", () => {
@@ -32,6 +33,18 @@ export function registerProjectIPC() {
 
   ipcMain.handle("projects:detect", (_, folderPath: string) => {
     return detectProjectMeta(folderPath);
+  });
+
+  ipcMain.handle("projects:runCustomCommand", async (_, cmdString: string, projectPath: string) => {
+    return new Promise((resolve, reject) => {
+      runCustomCommandInTerminal(cmdString, projectPath, (error, stdout) => {
+        if (error) {
+          reject(error);
+        } else {
+          resolve(stdout);
+        }
+      });
+    });
   });
 
   ipcMain.handle("projects:launch", async (_, id: string, action: string) => {

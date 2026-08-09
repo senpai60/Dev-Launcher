@@ -14,6 +14,7 @@ import {
   Zap,
   Info,
   Cpu,
+  Plus,
 } from "lucide-react";
 import PageNavbar from "../../components/layout/navbar/PageNavbar";
 import {
@@ -31,7 +32,7 @@ import FolderPicker from "../../components/ui/Form/FolderPicker";
 import { useProjectContext } from "../../context/ProjectContext";
 import { useGroupContext } from "../../context/GroupContext";
 import { useProjectAPI } from "../../api/api";
-import { Project } from "../../../types/project";
+import { Project, ProjectCommand } from "../../../types/project";
 import { DetectedProjectMeta } from "../../../types/global";
 import vscodeIcon from "../../app-icons/vscode.svg";
 import "./projects.css";
@@ -45,9 +46,13 @@ const ProjectsPage: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
 
-  // Drawer State
+  // Drawer & Commands State
   const [selectedDrawerProject, setSelectedDrawerProject] = useState<Project | null>(null);
   const [drawerMeta, setDrawerMeta] = useState<DetectedProjectMeta | null>(null);
+  const [isAddCommandOpen, setIsAddCommandOpen] = useState(false);
+  const [cmdName, setCmdName] = useState("");
+  const [cmdString, setCmdString] = useState("");
+  const [cmdDesc, setCmdDesc] = useState("");
 
   // Form State
   const [formName, setFormName] = useState("");
@@ -56,6 +61,7 @@ const ProjectsPage: React.FC = () => {
   const [formTags, setFormTags] = useState<string[]>(["React", "Node.js"]);
   const [formGroupId, setFormGroupId] = useState("");
   const [formIsFavorite, setFormIsFavorite] = useState(false);
+  const [formCommands, setFormCommands] = useState<ProjectCommand[]>([]);
   const [formError, setFormError] = useState("");
   const [detectedMeta, setDetectedMeta] = useState<DetectedProjectMeta | null>(null);
 
@@ -120,6 +126,7 @@ const ProjectsPage: React.FC = () => {
     setFormTags(["React", "Express", "Node.js"]);
     setFormGroupId(groupParam || "");
     setFormIsFavorite(false);
+    setFormCommands([]);
     setFormError("");
     setDetectedMeta(null);
     setIsCreateOpen(true);
@@ -151,6 +158,7 @@ const ProjectsPage: React.FC = () => {
           if (meta.name) setFormName(meta.name);
           if (meta.tags && meta.tags.length > 0) setFormTags(meta.tags);
           if (meta.description) setFormDescription(meta.description);
+          if (meta.commands && meta.commands.length > 0) setFormCommands(meta.commands);
         }
       } catch (err) {
         if (extractedName) setFormName(extractedName);
@@ -176,6 +184,7 @@ const ProjectsPage: React.FC = () => {
       path: formPath.trim(),
       description: formDescription.trim(),
       tags: formTags,
+      commands: formCommands,
       groupId: formGroupId || undefined,
       isFavorite: formIsFavorite,
     };
@@ -184,6 +193,43 @@ const ProjectsPage: React.FC = () => {
       await createProject(newProjectData);
     }
     setIsCreateOpen(false);
+  };
+
+  const handleRunCustomCommand = async (cmd: ProjectCommand) => {
+    if (!selectedDrawerProject) return;
+    try {
+      await projectApi.runCustomCommand(cmd.command, selectedDrawerProject.path);
+    } catch (err) {
+      console.error("Failed to execute command:", err);
+    }
+  };
+
+  const handleAddCommandSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedDrawerProject || !cmdName.trim() || !cmdString.trim()) return;
+
+    const newCmd: ProjectCommand = {
+      id: `cmd_${Date.now()}`,
+      name: cmdName.trim(),
+      command: cmdString.trim(),
+      description: cmdDesc.trim(),
+      isFavorite: false,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+
+    const existingCmds = selectedDrawerProject.commands || drawerMeta?.commands || [];
+    const updatedCmds = [...existingCmds, newCmd];
+
+    if (editProject) {
+      await editProject(selectedDrawerProject.id, { commands: updatedCmds });
+      setSelectedDrawerProject({ ...selectedDrawerProject, commands: updatedCmds });
+    }
+
+    setCmdName("");
+    setCmdString("");
+    setCmdDesc("");
+    setIsAddCommandOpen(false);
   };
 
   const toggleFavorite = async (id: string) => {
@@ -209,7 +255,7 @@ const ProjectsPage: React.FC = () => {
   const getDynamicMenuItems = (project: ProjectCardData): ContextMenuItem[] => [
     {
       id: "details",
-      label: "View Phase 4 Details",
+      label: "View Project Details & Commands",
       icon: <Info size={14} />,
       onClick: () => handleOpenDrawer(project),
     },
@@ -277,6 +323,7 @@ const ProjectsPage: React.FC = () => {
   };
 
   const assignedGroup = (groups || []).find((g) => g.id === selectedDrawerProject?.groupId);
+  const activeCommands = selectedDrawerProject?.commands || drawerMeta?.commands || [];
 
   return (
     <section className="projects-page">
@@ -340,7 +387,7 @@ const ProjectsPage: React.FC = () => {
         )}
       </div>
 
-      {/* SHARED DRAWER — PHASE 4 PROJECT DETAILS */}
+      {/* SHARED DRAWER — PHASE 4 & PHASE 5 CUSTOM COMMANDS */}
       <Drawer
         isOpen={Boolean(selectedDrawerProject)}
         onClose={() => setSelectedDrawerProject(null)}
@@ -376,6 +423,66 @@ const ProjectsPage: React.FC = () => {
                 <Folder size={14} />
                 <span>Folder</span>
               </button>
+            </div>
+
+            {/* PHASE 5: CUSTOM PROJECT COMMANDS */}
+            <div className="drawer-section">
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <span className="drawer-section-title">
+                  <Play size={14} style={{ color: "#10b981" }} />
+                  <span>Phase 5 Custom Commands</span>
+                </span>
+                <button
+                  type="button"
+                  className="action-btn text-button"
+                  style={{ padding: "2px 6px", fontSize: "var(--text-xs)", display: "inline-flex", alignItems: "center", gap: 4 }}
+                  onClick={() => setIsAddCommandOpen(true)}
+                >
+                  <Plus size={12} />
+                  <span>Add Command</span>
+                </button>
+              </div>
+
+              {activeCommands.length > 0 ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {activeCommands.map((cmd) => (
+                    <div
+                      key={cmd.id}
+                      style={{
+                        backgroundColor: "var(--card-surface)",
+                        border: "1px solid var(--bg-tirtiary)",
+                        borderRadius: "8px",
+                        padding: "8px 12px",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                      }}
+                    >
+                      <div style={{ display: "flex", flexDirection: "column", gap: 2, overflow: "hidden" }}>
+                        <span style={{ fontSize: "var(--text-sm)", fontWeight: "var(--font-medium)" as any, color: "var(--text-primary)" }}>
+                          {cmd.name}
+                        </span>
+                        <span style={{ fontFamily: "var(--font-mono)", fontSize: "var(--text-xs)", color: "var(--text-tertiary)" }}>
+                          {cmd.command}
+                        </span>
+                      </div>
+
+                      <button
+                        className="app-launch-btn text-button"
+                        style={{ padding: "4px 10px", fontSize: "var(--text-xs)" }}
+                        onClick={() => handleRunCustomCommand(cmd)}
+                      >
+                        <Play size={12} />
+                        <span>Run</span>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-meta" style={{ fontSize: "var(--text-xs)", fontStyle: "italic" }}>
+                  No custom commands defined yet. Click + Add Command.
+                </p>
+              )}
             </div>
 
             {/* Section 1: Auto-Detected Tech Stack & Tags */}
@@ -463,22 +570,58 @@ const ProjectsPage: React.FC = () => {
                 </button>
               </div>
             </div>
-
-            {/* Section 4: Metadata & Timestamps */}
-            {selectedDrawerProject.description && (
-              <div className="drawer-section">
-                <span className="drawer-section-title">
-                  <Info size={14} />
-                  <span>Description</span>
-                </span>
-                <p className="text-meta" style={{ fontSize: "var(--text-sm)", lineHeight: "var(--lh-ui)" }}>
-                  {selectedDrawerProject.description}
-                </p>
-              </div>
-            )}
           </>
         )}
       </Drawer>
+
+      {/* ADD CUSTOM COMMAND DIALOG */}
+      <Dialog
+        isOpen={isAddCommandOpen}
+        onClose={() => setIsAddCommandOpen(false)}
+        title="Add Custom Project Command"
+        footer={
+          <>
+            <button
+              className="action-btn text-button"
+              style={{ padding: "8px 16px" }}
+              onClick={() => setIsAddCommandOpen(false)}
+            >
+              Cancel
+            </button>
+            <button
+              className="primary-action-btn text-button"
+              onClick={handleAddCommandSubmit}
+            >
+              Save Command
+            </button>
+          </>
+        }
+      >
+        <form onSubmit={handleAddCommandSubmit}>
+          <Input
+            label="Command Name"
+            placeholder="e.g. Start Dev Server, Build, Test"
+            value={cmdName}
+            onChange={(e) => setCmdName(e.target.value)}
+            required
+          />
+
+          <Input
+            label="Command String"
+            placeholder="e.g. npm run dev, python main.py"
+            value={cmdString}
+            onChange={(e) => setCmdString(e.target.value)}
+            required
+          />
+
+          <Input
+            label="Description (Optional)"
+            placeholder="e.g. Launch local Vite development server"
+            value={cmdDesc}
+            onChange={(e) => setCmdDesc(e.target.value)}
+          />
+        </form>
+      </Dialog>
 
       {/* REUSABLE DIALOG & NEW PROJECT FORM WITH AUTO DETECTION */}
       <Dialog

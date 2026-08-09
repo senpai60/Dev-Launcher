@@ -7,6 +7,7 @@ export type Project = {
   groupId?: string;
   tags: string[];
   isFavorite: boolean;
+  commands?: ProjectCommand[];
   createdAt: number;
   updatedAt: number;
   lastOpenedAt?: number;

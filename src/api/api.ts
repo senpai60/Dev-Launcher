@@ -100,6 +100,10 @@ export const useProjectAPI = () => {
         return {
           name,
           tags: Array.from(new Set(tags)),
+          commands: [
+            { id: "cmd_dev", name: "Start Dev Server", command: "npm run dev", isFavorite: true, createdAt: Date.now(), updatedAt: Date.now() },
+            { id: "cmd_build", name: "Build Production Bundle", command: "npm run build", isFavorite: false, createdAt: Date.now(), updatedAt: Date.now() },
+          ],
           details: {
             languages: ["TypeScript", "JavaScript"],
             frameworks: ["React"],
@@ -108,6 +112,15 @@ export const useProjectAPI = () => {
             hasDocker: false,
           },
         };
+      }
+    },
+
+    runCustomCommand: async (cmdString: string, projectPath: string) => {
+      if (projectApi && projectApi.runCustomCommand) {
+        return await projectApi.runCustomCommand(cmdString, projectPath);
+      } else {
+        console.log(`[Web Mode Mock Exec] Command: "${cmdString}" in ${projectPath}`);
+        return true;
       }
     },
 

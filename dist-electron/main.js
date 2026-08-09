@@ -1,169 +1,180 @@
-import { app as f, ipcMain as d, BrowserWindow as k } from "electron";
-import { createRequire as T } from "node:module";
-import { fileURLToPath as F } from "node:url";
-import c, { join as D } from "node:path";
-import v, { readFileSync as L, writeFileSync as N, mkdirSync as J } from "fs";
-import { randomUUID as U } from "node:crypto";
-import { exec as g } from "child_process";
-import w from "path";
-const M = () => {
-  const t = D(f.getPath("userData"), "DevLauncher");
-  return J(t, { recursive: !0 }), t;
+import { app as h, ipcMain as l, BrowserWindow as R } from "electron";
+import { createRequire as J } from "node:module";
+import { fileURLToPath as U } from "node:url";
+import u, { join as O } from "node:path";
+import P, { readFileSync as B, writeFileSync as M, mkdirSync as b } from "fs";
+import { randomUUID as q } from "node:crypto";
+import { exec as v } from "child_process";
+import _ from "path";
+const W = () => {
+  const t = O(h.getPath("userData"), "DevLauncher");
+  return b(t, { recursive: !0 }), t;
 };
-console.log(f.getPath("userData"));
-const E = (t) => D(M(), `${t}.json`), O = (t) => {
+console.log(h.getPath("userData"));
+const I = (t) => O(W(), `${t}.json`), C = (t) => {
   try {
-    const n = L(E(t), "utf8");
+    const n = B(I(t), "utf8");
     return JSON.parse(n);
   } catch {
     return [];
   }
-}, y = (t, n) => {
+}, $ = (t, n) => {
   try {
-    N(E(t), JSON.stringify(n));
+    M(I(t), JSON.stringify(n));
   } catch (e) {
     console.error("Error saving data:", e);
   }
 };
-function m() {
+function j() {
   try {
-    return O("projects");
+    return C("projects");
   } catch {
     return [];
   }
 }
-function A(t) {
-  y("projects", t);
+function x(t) {
+  $("projects", t);
 }
-function R(t = "id") {
-  const n = U().replace(/-/g, "").slice(0, 12);
+function F(t = "id") {
+  const n = q().replace(/-/g, "").slice(0, 12);
   return `${t}_${n}`;
 }
-function q(t, n = !1, e) {
-  const r = c.resolve(t), s = `code ${n ? "-n" : "-r"} "${r}"`;
-  g(s, (i, a, j) => {
-    if (i) {
-      console.error(`Failed to open VS Code: ${j}`), e && e(i, null);
+function z(t, n = !1, e) {
+  const o = u.resolve(t), r = `code ${n ? "-n" : "-r"} "${o}"`;
+  v(r, (a, g, i) => {
+    if (a) {
+      console.error(`Failed to open VS Code: ${i}`), e && e(a, null);
       return;
     }
-    console.log(`Opened ${r} in VS Code`), e && e(null, a);
-  });
-}
-function B(t, n) {
-  const e = c.resolve(t), r = `cursor "${e}"`;
-  g(r, (o, s, i) => {
-    if (o) {
-      console.error(`Failed to open Cursor: ${i}`), n && n(o, null);
-      return;
-    }
-    console.log(`Opened ${e} in Cursor`), n && n(null, s);
-  });
-}
-function W(t, n) {
-  const e = c.resolve(t), r = `agy "${e}"`;
-  g(r, (o, s, i) => {
-    if (o) {
-      console.error(`Failed to open Antigravity: ${i}`), n && n(o, null);
-      return;
-    }
-    console.log(`Opened ${e} in Antigravity`), n && n(null, s);
-  });
-}
-function z(t, n) {
-  const e = c.resolve(t), r = `start cmd /k cd "${e}"`;
-  g(r, (o, s, i) => {
-    if (o) {
-      console.error(`error opening terminal: ${i}`, o), n && n(o, null);
-      return;
-    }
-    console.log("terminal opend successfully", e), n && n(null, s);
+    console.log(`Opened ${o} in VS Code`), e && e(null, g);
   });
 }
 function H(t, n) {
-  const e = c.resolve(t), r = `explorer.exe "${e}"`;
-  g(r, (o, s, i) => {
-    if (o) {
-      console.error(`Failed to open Explorer: ${i}`), n && n(o, null);
+  const e = u.resolve(t), o = `cursor "${e}"`;
+  v(o, (s, r, a) => {
+    if (s) {
+      console.error(`Failed to open Cursor: ${a}`), n && n(s, null);
       return;
     }
-    console.log(`Opened ${e} in Explorer`), n && n(null, s);
+    console.log(`Opened ${e} in Cursor`), n && n(null, r);
   });
 }
-function K() {
-  return m();
+function K(t, n) {
+  const e = u.resolve(t), o = `agy "${e}"`;
+  v(o, (s, r, a) => {
+    if (s) {
+      console.error(`Failed to open Antigravity: ${a}`), n && n(s, null);
+      return;
+    }
+    console.log(`Opened ${e} in Antigravity`), n && n(null, r);
+  });
 }
-function $(t) {
-  return m().find((e) => e.id === t);
+function Q(t, n) {
+  const e = u.resolve(t), o = `start cmd /k cd /d "${e}"`;
+  v(o, (s, r, a) => {
+    if (s) {
+      console.error(`error opening terminal: ${a}`, s), n && n(s, null);
+      return;
+    }
+    console.log("terminal opened successfully", e), n && n(null, r);
+  });
 }
-function Q(t) {
-  const n = m(), e = {
+function X(t, n) {
+  const e = u.resolve(t), o = `explorer.exe "${e}"`;
+  v(o, (s, r, a) => {
+    if (s) {
+      console.error(`Failed to open Explorer: ${a}`), n && n(s, null);
+      return;
+    }
+    console.log(`Opened ${e} in Explorer`), n && n(null, r);
+  });
+}
+function Y(t, n, e) {
+  const o = u.resolve(n), s = `start cmd /k "cd /d "${o}" && ${t}"`;
+  v(s, (r, a, g) => {
+    if (r) {
+      console.error(`Failed to execute command "${t}": ${g}`, r), e && e(r, null);
+      return;
+    }
+    console.log(`Executing "${t}" in ${o}`), e && e(null, a);
+  });
+}
+function Z() {
+  return j();
+}
+function G(t) {
+  return j().find((e) => e.id === t);
+}
+function ee(t) {
+  const n = j(), e = {
     ...t,
-    id: t.id || R("proj"),
+    id: t.id || F("proj"),
     tags: t.tags || [],
     isFavorite: t.isFavorite ?? !1,
     createdAt: t.createdAt || Date.now(),
     updatedAt: t.updatedAt || Date.now()
   };
-  return n.push(e), A(n), e;
+  return n.push(e), x(n), e;
 }
-function I(t, n) {
-  const e = m(), r = e.findIndex((s) => s.id === t);
-  if (r === -1)
+function T(t, n) {
+  const e = j(), o = e.findIndex((r) => r.id === t);
+  if (o === -1)
     return;
-  const o = {
-    ...e[r],
+  const s = {
+    ...e[o],
     ...n,
     updatedAt: Date.now()
   };
-  return e[r] = o, A(e), o;
+  return e[o] = s, x(e), s;
 }
-function X(t) {
-  const n = m(), e = n.filter((r) => r.id !== t);
-  return e.length === n.length ? !1 : (A(e), !0);
+function te(t) {
+  const n = j(), e = n.filter((o) => o.id !== t);
+  return e.length === n.length ? !1 : (x(e), !0);
 }
-function Y(t, n, e = !1, r) {
-  const o = $(t);
-  if (!o) {
-    r && r(new Error("Project not found"), null);
+function ne(t, n, e = !1, o) {
+  const s = G(t);
+  if (!s) {
+    o && o(new Error("Project not found"), null);
     return;
   }
-  I(t, { lastOpenedAt: Date.now() });
+  T(t, { lastOpenedAt: Date.now() });
   try {
-    const s = o.path;
+    const r = s.path;
     switch (n.toLowerCase()) {
       case "open-in-vscode":
       case "vscode":
-        q(s, e, r);
+        z(r, e, o);
         break;
       case "open-in-cursor":
       case "cursor":
-        B(s, r);
+        H(r, o);
         break;
       case "open-in-antigravity":
       case "antigravity":
-        W(s, r);
+        K(r, o);
         break;
       case "open-in-terminal":
       case "terminal":
-        z(s, r);
+        Q(r, o);
         break;
       case "folder":
       case "explorer":
       default:
-        H(s, r);
+        X(r, o);
         break;
     }
-  } catch (s) {
-    r(s, null);
+  } catch (r) {
+    o(r, null);
   }
 }
-function Z(t) {
-  const n = w.basename(t) || "New Project", e = /* @__PURE__ */ new Set(), r = [], o = [];
-  let s, i;
-  if (!t || !v.existsSync(t))
+function oe(t) {
+  const n = _.basename(t) || "New Project", e = /* @__PURE__ */ new Set(), o = [], s = [], r = [];
+  let a, g;
+  if (!t || !P.existsSync(t))
     return {
       name: n,
       tags: [],
+      commands: [],
       details: {
         languages: [],
         frameworks: [],
@@ -171,45 +182,107 @@ function Z(t) {
         hasDocker: !1
       }
     };
-  const a = (p) => v.existsSync(w.join(t, p)), j = a(".git");
-  j && e.add("Git");
-  const x = a("Dockerfile") || a("docker-compose.yml") || a("docker-compose.yaml");
-  x && e.add("Docker"), a("pnpm-lock.yaml") ? (s = "pnpm", e.add("pnpm")) : a("yarn.lock") ? (s = "yarn", e.add("yarn")) : a("bun.lockb") || a("bun.lock") ? (s = "bun", e.add("bun")) : a("package-lock.json") && (s = "npm", e.add("npm"));
-  const S = w.join(t, "package.json");
-  if (v.existsSync(S))
+  const i = (c) => P.existsSync(_.join(t, c)), D = i(".git");
+  D && e.add("Git");
+  const k = i("Dockerfile") || i("docker-compose.yml") || i("docker-compose.yaml");
+  k && e.add("Docker");
+  let p = "npm run";
+  i("pnpm-lock.yaml") ? (a = "pnpm", p = "pnpm", e.add("pnpm")) : i("yarn.lock") ? (a = "yarn", p = "yarn", e.add("yarn")) : i("bun.lockb") || i("bun.lock") ? (a = "bun", p = "bun run", e.add("bun")) : i("package-lock.json") && (a = "npm", p = "npm run", e.add("npm"));
+  const E = _.join(t, "package.json");
+  if (P.existsSync(E))
     try {
-      const p = JSON.parse(v.readFileSync(S, "utf-8"));
-      p.description && (i = p.description);
-      const l = {
-        ...p.dependencies || {},
-        ...p.devDependencies || {}
+      const c = JSON.parse(P.readFileSync(E, "utf-8"));
+      c.description && (g = c.description);
+      const f = {
+        ...c.dependencies || {},
+        ...c.devDependencies || {}
       };
-      l.typescript || a("tsconfig.json") ? (r.push("TypeScript"), e.add("TypeScript")) : (r.push("JavaScript"), e.add("JavaScript")), l.next ? (o.push("Next.js"), e.add("Next.js")) : l.react ? (o.push("React"), e.add("React")) : l.vue ? (o.push("Vue"), e.add("Vue")) : l["@angular/core"] ? (o.push("Angular"), e.add("Angular")) : l.svelte && (o.push("Svelte"), e.add("Svelte")), (l.vite || a("vite.config.ts") || a("vite.config.js")) && (o.push("Vite"), e.add("Vite")), l.express && (o.push("Express"), e.add("Express")), l.electron && (o.push("Electron"), e.add("Electron")), s || (s = "npm", e.add("npm"));
+      if (f.typescript || i("tsconfig.json") ? (o.push("TypeScript"), e.add("TypeScript")) : (o.push("JavaScript"), e.add("JavaScript")), f.next ? (s.push("Next.js"), e.add("Next.js")) : f.react ? (s.push("React"), e.add("React")) : f.vue ? (s.push("Vue"), e.add("Vue")) : f["@angular/core"] ? (s.push("Angular"), e.add("Angular")) : f.svelte && (s.push("Svelte"), e.add("Svelte")), (f.vite || i("vite.config.ts") || i("vite.config.js")) && (s.push("Vite"), e.add("Vite")), f.express && (s.push("Express"), e.add("Express")), f.electron && (s.push("Electron"), e.add("Electron")), a || (a = "npm", e.add("npm")), c.scripts && typeof c.scripts == "object") {
+        const A = c.scripts, d = Date.now();
+        A.dev ? r.push({
+          id: `cmd_dev_${d}`,
+          name: "Start Dev Server",
+          command: `${p} dev`,
+          description: "Launch local development server",
+          isFavorite: !0,
+          createdAt: d,
+          updatedAt: d
+        }) : A.start && r.push({
+          id: `cmd_start_${d}`,
+          name: "Start Application",
+          command: `${p} start`,
+          description: "Start application process",
+          isFavorite: !0,
+          createdAt: d,
+          updatedAt: d
+        }), A.build && r.push({
+          id: `cmd_build_${d}`,
+          name: "Build Production Bundle",
+          command: `${p} build`,
+          description: "Compile production distribution assets",
+          isFavorite: !1,
+          createdAt: d,
+          updatedAt: d
+        }), A.test && r.push({
+          id: `cmd_test_${d}`,
+          name: "Run Test Suite",
+          command: `${p} test`,
+          description: "Execute test scripts",
+          isFavorite: !1,
+          createdAt: d,
+          updatedAt: d
+        }), A.lint && r.push({
+          id: `cmd_lint_${d}`,
+          name: "Lint & Format",
+          command: `${p} lint`,
+          description: "Run code linter",
+          isFavorite: !1,
+          createdAt: d,
+          updatedAt: d
+        });
+      }
     } catch {
     }
-  return (a("requirements.txt") || a("pyproject.toml") || a("Pipfile")) && (r.push("Python"), e.add("Python")), a("go.mod") && (r.push("Go"), e.add("Go")), a("Cargo.toml") && (r.push("Rust"), e.add("Rust")), (a("pom.xml") || a("build.gradle")) && (r.push("Java"), e.add("Java")), {
+  if (r.length === 0) {
+    const c = Date.now();
+    r.push({
+      id: `cmd_default_${c}`,
+      name: "Start Application",
+      command: `${p} start`,
+      description: "Default application start command",
+      isFavorite: !0,
+      createdAt: c,
+      updatedAt: c
+    });
+  }
+  return (i("requirements.txt") || i("pyproject.toml") || i("Pipfile")) && (o.push("Python"), e.add("Python")), i("go.mod") && (o.push("Go"), e.add("Go")), i("Cargo.toml") && (o.push("Rust"), e.add("Rust")), (i("pom.xml") || i("build.gradle")) && (o.push("Java"), e.add("Java")), {
     name: n,
     tags: Array.from(e),
-    description: i,
+    description: g,
+    commands: r,
     details: {
-      languages: r,
-      frameworks: o,
-      packageManager: s,
-      hasGit: j,
-      hasDocker: x
+      languages: o,
+      frameworks: s,
+      packageManager: a,
+      hasGit: D,
+      hasDocker: k
     }
   };
 }
-function b() {
-  d.handle("projects:getAll", () => K()), d.handle("projects:get", (t, n) => $(n)), d.handle("projects:add", (t, n) => Q(n)), d.handle("projects:update", (t, n, e) => I(n, e)), d.handle("projects:delete", (t, n) => X(n)), d.handle("projects:detect", (t, n) => Z(n)), d.handle("projects:launch", async (t, n, e) => new Promise((r, o) => {
-    Y(n, e, !1, (s, i) => {
-      s ? o(s) : r(i);
+function re() {
+  l.handle("projects:getAll", () => Z()), l.handle("projects:get", (t, n) => G(n)), l.handle("projects:add", (t, n) => ee(n)), l.handle("projects:update", (t, n, e) => T(n, e)), l.handle("projects:delete", (t, n) => te(n)), l.handle("projects:detect", (t, n) => oe(n)), l.handle("projects:runCustomCommand", async (t, n, e) => new Promise((o, s) => {
+    Y(n, e, (r, a) => {
+      r ? s(r) : o(a);
+    });
+  })), l.handle("projects:launch", async (t, n, e) => new Promise((o, s) => {
+    ne(n, e, !1, (r, a) => {
+      r ? s(r) : o(a);
     });
   }));
 }
-function h() {
+function w() {
   try {
-    const t = O("groups");
+    const t = C("groups");
     if (!Array.isArray(t) || t.length === 0) {
       const n = [
         { id: "group_freelance", name: "Freelance", sortOrder: 1, createdAt: Date.now(), updatedAt: Date.now() },
@@ -217,25 +290,25 @@ function h() {
         { id: "group_experiments", name: "Experiments", sortOrder: 3, createdAt: Date.now(), updatedAt: Date.now() },
         { id: "group_learning", name: "Learning", sortOrder: 4, createdAt: Date.now(), updatedAt: Date.now() }
       ];
-      return y("groups", n), n;
+      return $("groups", n), n;
     }
     return t;
   } catch {
     return [];
   }
 }
-function _(t) {
-  y("groups", t);
+function S(t) {
+  $("groups", t);
 }
-function ee() {
-  return h();
+function se() {
+  return w();
 }
-function te(t) {
-  return h().find((e) => e.id === t);
+function ae(t) {
+  return w().find((e) => e.id === t);
 }
-function ne(t) {
-  const n = h(), e = {
-    id: t.id || R("group"),
+function ie(t) {
+  const n = w(), e = {
+    id: t.id || F("group"),
     name: t.name,
     icon: t.icon,
     color: t.color,
@@ -243,53 +316,53 @@ function ne(t) {
     createdAt: t.createdAt || Date.now(),
     updatedAt: t.updatedAt || Date.now()
   };
-  return n.push(e), _(n), e;
+  return n.push(e), S(n), e;
 }
-function re(t, n) {
-  const e = h(), r = e.findIndex((s) => s.id === t);
-  if (r === -1)
+function de(t, n) {
+  const e = w(), o = e.findIndex((r) => r.id === t);
+  if (o === -1)
     return;
-  const o = {
-    ...e[r],
+  const s = {
+    ...e[o],
     ...n,
     updatedAt: Date.now()
   };
-  return e[r] = o, _(e), o;
+  return e[o] = s, S(e), s;
 }
-function oe(t) {
-  const n = h(), e = n.filter((r) => r.id !== t);
-  return e.length === n.length ? !1 : (_(e), !0);
+function ce(t) {
+  const n = w(), e = n.filter((o) => o.id !== t);
+  return e.length === n.length ? !1 : (S(e), !0);
 }
-function se() {
-  d.handle("groups:getAll", () => ee()), d.handle("groups:get", (t, n) => te(n)), d.handle("groups:add", (t, n) => ne(n)), d.handle("groups:update", (t, n, e) => re(n, e)), d.handle("groups:delete", (t, n) => oe(n));
+function ue() {
+  l.handle("groups:getAll", () => se()), l.handle("groups:get", (t, n) => ae(n)), l.handle("groups:add", (t, n) => ie(n)), l.handle("groups:update", (t, n, e) => de(n, e)), l.handle("groups:delete", (t, n) => ce(n));
 }
-T(import.meta.url);
-const G = c.dirname(F(import.meta.url));
-process.env.APP_ROOT = c.join(G, "..");
-const P = process.env.VITE_DEV_SERVER_URL, ge = c.join(process.env.APP_ROOT, "dist-electron"), V = c.join(process.env.APP_ROOT, "dist");
-process.env.VITE_PUBLIC = P ? c.join(process.env.APP_ROOT, "public") : V;
-let u;
-function C() {
-  u = new k({
-    icon: c.join(process.env.VITE_PUBLIC, "electron-vite.svg"),
+J(import.meta.url);
+const V = u.dirname(U(import.meta.url));
+process.env.APP_ROOT = u.join(V, "..");
+const y = process.env.VITE_DEV_SERVER_URL, je = u.join(process.env.APP_ROOT, "dist-electron"), L = u.join(process.env.APP_ROOT, "dist");
+process.env.VITE_PUBLIC = y ? u.join(process.env.APP_ROOT, "public") : L;
+let m;
+function N() {
+  m = new R({
+    icon: u.join(process.env.VITE_PUBLIC, "electron-vite.svg"),
     webPreferences: {
-      preload: c.join(G, "preload.mjs")
+      preload: u.join(V, "preload.mjs")
     }
-  }), u.webContents.on("did-finish-load", () => {
-    u == null || u.webContents.send("main-process-message", (/* @__PURE__ */ new Date()).toLocaleString());
-  }), P ? u.loadURL(P) : u.loadFile(c.join(V, "index.html"));
+  }), m.webContents.on("did-finish-load", () => {
+    m == null || m.webContents.send("main-process-message", (/* @__PURE__ */ new Date()).toLocaleString());
+  }), y ? m.loadURL(y) : m.loadFile(u.join(L, "index.html"));
 }
-f.on("window-all-closed", () => {
-  process.platform !== "darwin" && (f.quit(), u = null);
+h.on("window-all-closed", () => {
+  process.platform !== "darwin" && (h.quit(), m = null);
 });
-f.on("activate", () => {
-  k.getAllWindows().length === 0 && C();
+h.on("activate", () => {
+  R.getAllWindows().length === 0 && N();
 });
-f.whenReady().then(C);
-b();
-se();
+h.whenReady().then(N);
+re();
+ue();
 export {
-  ge as MAIN_DIST,
-  V as RENDERER_DIST,
-  P as VITE_DEV_SERVER_URL
+  je as MAIN_DIST,
+  L as RENDERER_DIST,
+  y as VITE_DEV_SERVER_URL
 };

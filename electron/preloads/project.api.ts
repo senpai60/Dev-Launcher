@@ -15,6 +15,9 @@ export const projectAPI = {
 
   detect: (folderPath: string) => ipcRenderer.invoke("projects:detect", folderPath),
 
+  runCustomCommand: (cmdString: string, projectPath: string) =>
+    ipcRenderer.invoke("projects:runCustomCommand", cmdString, projectPath),
+
   launch: (id: string, action: string) =>
     ipcRenderer.invoke("projects:launch", id, action),
 };

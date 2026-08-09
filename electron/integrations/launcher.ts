@@ -62,7 +62,7 @@ export function openTerminal(
   cb?: (error: Error | null, stdout: string | null) => void,
 ) {
   const absolutePath = path.resolve(projectPath);
-  const command = `start cmd /k cd "${absolutePath}"`;
+  const command = `start cmd /k cd /d "${absolutePath}"`;
 
   exec(command, (err, stdout, stderr) => {
     if (err) {
@@ -70,7 +70,7 @@ export function openTerminal(
       if (cb) cb(err, null);
       return;
     }
-    console.log("terminal opend successfully", absolutePath);
+    console.log("terminal opened successfully", absolutePath);
     if (cb) cb(null, stdout);
   });
 }
@@ -88,6 +88,25 @@ export function openInExplorer(
       return;
     }
     console.log(`Opened ${absolutePath} in Explorer`);
+    if (cb) cb(null, stdout);
+  });
+}
+
+export function runCustomCommandInTerminal(
+  cmdString: string,
+  projectPath: string,
+  cb?: (error: Error | null, stdout: string | null) => void,
+) {
+  const absolutePath = path.resolve(projectPath);
+  const command = `start cmd /k "cd /d "${absolutePath}" && ${cmdString}"`;
+
+  exec(command, (err, stdout, stderr) => {
+    if (err) {
+      console.error(`Failed to execute command "${cmdString}": ${stderr}`, err);
+      if (cb) cb(err, null);
+      return;
+    }
+    console.log(`Executing "${cmdString}" in ${absolutePath}`);
     if (cb) cb(null, stdout);
   });
 }

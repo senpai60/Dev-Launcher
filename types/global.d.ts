@@ -10,6 +10,7 @@ export interface DetectedProjectMeta {
   name: string;
   tags: string[];
   description?: string;
+  commands: ProjectTypes.ProjectCommand[];
   details: {
     languages: string[];
     frameworks: string[];
@@ -57,6 +58,7 @@ declare global {
         update: (id: string, data: Partial<Project>) => Promise<void>;
         delete: (id: string) => Promise<void>;
         detect: (folderPath: string) => Promise<DetectedProjectMeta>;
+        runCustomCommand: (cmdString: string, projectPath: string) => Promise<void>;
         launch: (id: string, action: string) => Promise<void>;
       };
       groupAPI: {

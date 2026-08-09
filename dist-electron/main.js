@@ -1,251 +1,295 @@
-import { app as u, ipcMain as c, BrowserWindow as w } from "electron";
-import { createRequire as x } from "node:module";
-import { fileURLToPath as C } from "node:url";
-import a, { join as j } from "node:path";
-import { readFileSync as S, writeFileSync as T, mkdirSync as G } from "fs";
-import { randomUUID as V } from "node:crypto";
-import { exec as l } from "child_process";
-const F = () => {
-  const n = j(u.getPath("userData"), "DevLauncher");
-  return G(n, { recursive: !0 }), n;
+import { app as f, ipcMain as d, BrowserWindow as k } from "electron";
+import { createRequire as T } from "node:module";
+import { fileURLToPath as F } from "node:url";
+import c, { join as D } from "node:path";
+import v, { readFileSync as L, writeFileSync as N, mkdirSync as J } from "fs";
+import { randomUUID as U } from "node:crypto";
+import { exec as g } from "child_process";
+import w from "path";
+const M = () => {
+  const t = D(f.getPath("userData"), "DevLauncher");
+  return J(t, { recursive: !0 }), t;
 };
-console.log(u.getPath("userData"));
-const A = (n) => j(F(), `${n}.json`), _ = (n) => {
+console.log(f.getPath("userData"));
+const E = (t) => D(M(), `${t}.json`), O = (t) => {
   try {
-    const e = S(A(n), "utf8");
-    return JSON.parse(e);
+    const n = L(E(t), "utf8");
+    return JSON.parse(n);
   } catch {
     return [];
   }
-}, m = (n, e) => {
+}, y = (t, n) => {
   try {
-    T(A(n), JSON.stringify(e));
-  } catch (t) {
-    console.error("Error saving data:", t);
+    N(E(t), JSON.stringify(n));
+  } catch (e) {
+    console.error("Error saving data:", e);
   }
 };
-function p() {
+function m() {
   try {
-    return _("projects");
+    return O("projects");
   } catch {
     return [];
   }
 }
-function h(n) {
-  m("projects", n);
+function A(t) {
+  y("projects", t);
 }
-function v(n = "id") {
-  const e = V().replace(/-/g, "").slice(0, 12);
-  return `${n}_${e}`;
+function R(t = "id") {
+  const n = U().replace(/-/g, "").slice(0, 12);
+  return `${t}_${n}`;
 }
-function L(n, e = !1, t) {
-  const r = a.resolve(n), s = `code ${e ? "-n" : "-r"} "${r}"`;
-  l(s, (i, D, R) => {
+function q(t, n = !1, e) {
+  const r = c.resolve(t), s = `code ${n ? "-n" : "-r"} "${r}"`;
+  g(s, (i, a, j) => {
     if (i) {
-      console.error(`Failed to open VS Code: ${R}`), t && t(i, null);
+      console.error(`Failed to open VS Code: ${j}`), e && e(i, null);
       return;
     }
-    console.log(`Opened ${r} in VS Code`), t && t(null, D);
+    console.log(`Opened ${r} in VS Code`), e && e(null, a);
   });
 }
-function U(n, e) {
-  const t = a.resolve(n), r = `cursor "${t}"`;
-  l(r, (o, s, i) => {
+function B(t, n) {
+  const e = c.resolve(t), r = `cursor "${e}"`;
+  g(r, (o, s, i) => {
     if (o) {
-      console.error(`Failed to open Cursor: ${i}`), e && e(o, null);
+      console.error(`Failed to open Cursor: ${i}`), n && n(o, null);
       return;
     }
-    console.log(`Opened ${t} in Cursor`), e && e(null, s);
+    console.log(`Opened ${e} in Cursor`), n && n(null, s);
   });
 }
-function k(n, e) {
-  const t = a.resolve(n), r = `agy "${t}"`;
-  l(r, (o, s, i) => {
+function W(t, n) {
+  const e = c.resolve(t), r = `agy "${e}"`;
+  g(r, (o, s, i) => {
     if (o) {
-      console.error(`Failed to open Antigravity: ${i}`), e && e(o, null);
+      console.error(`Failed to open Antigravity: ${i}`), n && n(o, null);
       return;
     }
-    console.log(`Opened ${t} in Antigravity`), e && e(null, s);
+    console.log(`Opened ${e} in Antigravity`), n && n(null, s);
   });
 }
-function N(n, e) {
-  const t = a.resolve(n), r = `start cmd /k cd "${t}"`;
-  l(r, (o, s, i) => {
+function z(t, n) {
+  const e = c.resolve(t), r = `start cmd /k cd "${e}"`;
+  g(r, (o, s, i) => {
     if (o) {
-      console.error(`error opening terminal: ${i}`, o), e && e(o, null);
+      console.error(`error opening terminal: ${i}`, o), n && n(o, null);
       return;
     }
-    console.log("terminal opend successfully", t), e && e(null, s);
+    console.log("terminal opend successfully", e), n && n(null, s);
   });
 }
-function B(n, e) {
-  const t = a.resolve(n), r = `explorer.exe "${t}"`;
-  l(r, (o, s, i) => {
+function H(t, n) {
+  const e = c.resolve(t), r = `explorer.exe "${e}"`;
+  g(r, (o, s, i) => {
     if (o) {
-      console.error(`Failed to open Explorer: ${i}`), e && e(o, null);
+      console.error(`Failed to open Explorer: ${i}`), n && n(o, null);
       return;
     }
-    console.log(`Opened ${t} in Explorer`), e && e(null, s);
+    console.log(`Opened ${e} in Explorer`), n && n(null, s);
   });
 }
-function W() {
-  return p();
+function K() {
+  return m();
 }
-function O(n) {
-  return p().find((t) => t.id === n);
+function $(t) {
+  return m().find((e) => e.id === t);
 }
-function q(n) {
-  const e = p(), t = {
-    ...n,
-    id: n.id || v("proj"),
-    tags: n.tags || [],
-    isFavorite: n.isFavorite ?? !1,
-    createdAt: n.createdAt || Date.now(),
-    updatedAt: n.updatedAt || Date.now()
+function Q(t) {
+  const n = m(), e = {
+    ...t,
+    id: t.id || R("proj"),
+    tags: t.tags || [],
+    isFavorite: t.isFavorite ?? !1,
+    createdAt: t.createdAt || Date.now(),
+    updatedAt: t.updatedAt || Date.now()
   };
-  return e.push(t), h(e), t;
+  return n.push(e), A(n), e;
 }
-function y(n, e) {
-  const t = p(), r = t.findIndex((s) => s.id === n);
+function I(t, n) {
+  const e = m(), r = e.findIndex((s) => s.id === t);
   if (r === -1)
     return;
   const o = {
-    ...t[r],
-    ...e,
+    ...e[r],
+    ...n,
     updatedAt: Date.now()
   };
-  return t[r] = o, h(t), o;
+  return e[r] = o, A(e), o;
 }
-function J(n) {
-  const e = p(), t = e.filter((r) => r.id !== n);
-  return t.length === e.length ? !1 : (h(t), !0);
+function X(t) {
+  const n = m(), e = n.filter((r) => r.id !== t);
+  return e.length === n.length ? !1 : (A(e), !0);
 }
-function M(n, e, t = !1, r) {
-  const o = O(n);
+function Y(t, n, e = !1, r) {
+  const o = $(t);
   if (!o) {
     r && r(new Error("Project not found"), null);
     return;
   }
-  y(n, { lastOpenedAt: Date.now() });
+  I(t, { lastOpenedAt: Date.now() });
   try {
     const s = o.path;
-    switch (e.toLowerCase()) {
+    switch (n.toLowerCase()) {
       case "open-in-vscode":
       case "vscode":
-        L(s, t, r);
+        q(s, e, r);
         break;
       case "open-in-cursor":
       case "cursor":
-        U(s, r);
+        B(s, r);
         break;
       case "open-in-antigravity":
       case "antigravity":
-        k(s, r);
+        W(s, r);
         break;
       case "open-in-terminal":
       case "terminal":
-        N(s, r);
+        z(s, r);
         break;
       case "folder":
       case "explorer":
       default:
-        B(s, r);
+        H(s, r);
         break;
     }
   } catch (s) {
     r(s, null);
   }
 }
-function z() {
-  c.handle("projects:getAll", () => W()), c.handle("projects:get", (n, e) => O(e)), c.handle("projects:add", (n, e) => q(e)), c.handle("projects:update", (n, e, t) => y(e, t)), c.handle("projects:delete", (n, e) => J(e)), c.handle("projects:launch", async (n, e, t) => new Promise((r, o) => {
-    M(e, t, !1, (s, i) => {
+function Z(t) {
+  const n = w.basename(t) || "New Project", e = /* @__PURE__ */ new Set(), r = [], o = [];
+  let s, i;
+  if (!t || !v.existsSync(t))
+    return {
+      name: n,
+      tags: [],
+      details: {
+        languages: [],
+        frameworks: [],
+        hasGit: !1,
+        hasDocker: !1
+      }
+    };
+  const a = (p) => v.existsSync(w.join(t, p)), j = a(".git");
+  j && e.add("Git");
+  const x = a("Dockerfile") || a("docker-compose.yml") || a("docker-compose.yaml");
+  x && e.add("Docker"), a("pnpm-lock.yaml") ? (s = "pnpm", e.add("pnpm")) : a("yarn.lock") ? (s = "yarn", e.add("yarn")) : a("bun.lockb") || a("bun.lock") ? (s = "bun", e.add("bun")) : a("package-lock.json") && (s = "npm", e.add("npm"));
+  const S = w.join(t, "package.json");
+  if (v.existsSync(S))
+    try {
+      const p = JSON.parse(v.readFileSync(S, "utf-8"));
+      p.description && (i = p.description);
+      const l = {
+        ...p.dependencies || {},
+        ...p.devDependencies || {}
+      };
+      l.typescript || a("tsconfig.json") ? (r.push("TypeScript"), e.add("TypeScript")) : (r.push("JavaScript"), e.add("JavaScript")), l.next ? (o.push("Next.js"), e.add("Next.js")) : l.react ? (o.push("React"), e.add("React")) : l.vue ? (o.push("Vue"), e.add("Vue")) : l["@angular/core"] ? (o.push("Angular"), e.add("Angular")) : l.svelte && (o.push("Svelte"), e.add("Svelte")), (l.vite || a("vite.config.ts") || a("vite.config.js")) && (o.push("Vite"), e.add("Vite")), l.express && (o.push("Express"), e.add("Express")), l.electron && (o.push("Electron"), e.add("Electron")), s || (s = "npm", e.add("npm"));
+    } catch {
+    }
+  return (a("requirements.txt") || a("pyproject.toml") || a("Pipfile")) && (r.push("Python"), e.add("Python")), a("go.mod") && (r.push("Go"), e.add("Go")), a("Cargo.toml") && (r.push("Rust"), e.add("Rust")), (a("pom.xml") || a("build.gradle")) && (r.push("Java"), e.add("Java")), {
+    name: n,
+    tags: Array.from(e),
+    description: i,
+    details: {
+      languages: r,
+      frameworks: o,
+      packageManager: s,
+      hasGit: j,
+      hasDocker: x
+    }
+  };
+}
+function b() {
+  d.handle("projects:getAll", () => K()), d.handle("projects:get", (t, n) => $(n)), d.handle("projects:add", (t, n) => Q(n)), d.handle("projects:update", (t, n, e) => I(n, e)), d.handle("projects:delete", (t, n) => X(n)), d.handle("projects:detect", (t, n) => Z(n)), d.handle("projects:launch", async (t, n, e) => new Promise((r, o) => {
+    Y(n, e, !1, (s, i) => {
       s ? o(s) : r(i);
     });
   }));
 }
-function f() {
+function h() {
   try {
-    const n = _("groups");
-    if (!Array.isArray(n) || n.length === 0) {
-      const e = [
+    const t = O("groups");
+    if (!Array.isArray(t) || t.length === 0) {
+      const n = [
         { id: "group_freelance", name: "Freelance", sortOrder: 1, createdAt: Date.now(), updatedAt: Date.now() },
         { id: "group_personal", name: "Personal", sortOrder: 2, createdAt: Date.now(), updatedAt: Date.now() },
         { id: "group_experiments", name: "Experiments", sortOrder: 3, createdAt: Date.now(), updatedAt: Date.now() },
         { id: "group_learning", name: "Learning", sortOrder: 4, createdAt: Date.now(), updatedAt: Date.now() }
       ];
-      return m("groups", e), e;
+      return y("groups", n), n;
     }
-    return n;
+    return t;
   } catch {
     return [];
   }
 }
-function P(n) {
-  m("groups", n);
+function _(t) {
+  y("groups", t);
 }
-function H() {
-  return f();
+function ee() {
+  return h();
 }
-function K(n) {
-  return f().find((t) => t.id === n);
+function te(t) {
+  return h().find((e) => e.id === t);
 }
-function Q(n) {
-  const e = f(), t = {
-    id: n.id || v("group"),
-    name: n.name,
-    icon: n.icon,
-    color: n.color,
-    sortOrder: n.sortOrder ?? e.length + 1,
-    createdAt: n.createdAt || Date.now(),
-    updatedAt: n.updatedAt || Date.now()
+function ne(t) {
+  const n = h(), e = {
+    id: t.id || R("group"),
+    name: t.name,
+    icon: t.icon,
+    color: t.color,
+    sortOrder: t.sortOrder ?? n.length + 1,
+    createdAt: t.createdAt || Date.now(),
+    updatedAt: t.updatedAt || Date.now()
   };
-  return e.push(t), P(e), t;
+  return n.push(e), _(n), e;
 }
-function X(n, e) {
-  const t = f(), r = t.findIndex((s) => s.id === n);
+function re(t, n) {
+  const e = h(), r = e.findIndex((s) => s.id === t);
   if (r === -1)
     return;
   const o = {
-    ...t[r],
-    ...e,
+    ...e[r],
+    ...n,
     updatedAt: Date.now()
   };
-  return t[r] = o, P(t), o;
+  return e[r] = o, _(e), o;
 }
-function Y(n) {
-  const e = f(), t = e.filter((r) => r.id !== n);
-  return t.length === e.length ? !1 : (P(t), !0);
+function oe(t) {
+  const n = h(), e = n.filter((r) => r.id !== t);
+  return e.length === n.length ? !1 : (_(e), !0);
 }
-function Z() {
-  c.handle("groups:getAll", () => H()), c.handle("groups:get", (n, e) => K(e)), c.handle("groups:add", (n, e) => Q(e)), c.handle("groups:update", (n, e, t) => X(e, t)), c.handle("groups:delete", (n, e) => Y(e));
+function se() {
+  d.handle("groups:getAll", () => ee()), d.handle("groups:get", (t, n) => te(n)), d.handle("groups:add", (t, n) => ne(n)), d.handle("groups:update", (t, n, e) => re(n, e)), d.handle("groups:delete", (t, n) => oe(n));
 }
-x(import.meta.url);
-const E = a.dirname(C(import.meta.url));
-process.env.APP_ROOT = a.join(E, "..");
-const g = process.env.VITE_DEV_SERVER_URL, ae = a.join(process.env.APP_ROOT, "dist-electron"), I = a.join(process.env.APP_ROOT, "dist");
-process.env.VITE_PUBLIC = g ? a.join(process.env.APP_ROOT, "public") : I;
-let d;
-function $() {
-  d = new w({
-    icon: a.join(process.env.VITE_PUBLIC, "electron-vite.svg"),
+T(import.meta.url);
+const G = c.dirname(F(import.meta.url));
+process.env.APP_ROOT = c.join(G, "..");
+const P = process.env.VITE_DEV_SERVER_URL, ge = c.join(process.env.APP_ROOT, "dist-electron"), V = c.join(process.env.APP_ROOT, "dist");
+process.env.VITE_PUBLIC = P ? c.join(process.env.APP_ROOT, "public") : V;
+let u;
+function C() {
+  u = new k({
+    icon: c.join(process.env.VITE_PUBLIC, "electron-vite.svg"),
     webPreferences: {
-      preload: a.join(E, "preload.mjs")
+      preload: c.join(G, "preload.mjs")
     }
-  }), d.webContents.on("did-finish-load", () => {
-    d == null || d.webContents.send("main-process-message", (/* @__PURE__ */ new Date()).toLocaleString());
-  }), g ? d.loadURL(g) : d.loadFile(a.join(I, "index.html"));
+  }), u.webContents.on("did-finish-load", () => {
+    u == null || u.webContents.send("main-process-message", (/* @__PURE__ */ new Date()).toLocaleString());
+  }), P ? u.loadURL(P) : u.loadFile(c.join(V, "index.html"));
 }
-u.on("window-all-closed", () => {
-  process.platform !== "darwin" && (u.quit(), d = null);
+f.on("window-all-closed", () => {
+  process.platform !== "darwin" && (f.quit(), u = null);
 });
-u.on("activate", () => {
-  w.getAllWindows().length === 0 && $();
+f.on("activate", () => {
+  k.getAllWindows().length === 0 && C();
 });
-u.whenReady().then($);
-z();
-Z();
+f.whenReady().then(C);
+b();
+se();
 export {
-  ae as MAIN_DIST,
-  I as RENDERER_DIST,
-  g as VITE_DEV_SERVER_URL
+  ge as MAIN_DIST,
+  V as RENDERER_DIST,
+  P as VITE_DEV_SERVER_URL
 };

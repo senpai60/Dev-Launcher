@@ -1,5 +1,6 @@
 import { Project } from "../../types/project";
 import { ProjectGroup } from "../../types/group";
+import { DetectedProjectMeta } from "../../types/global";
 
 const PROJECTS_STORAGE_KEY = "dev_launcher_projects";
 const GROUPS_STORAGE_KEY = "dev_launcher_groups";
@@ -76,6 +77,37 @@ export const useProjectAPI = () => {
           localStorage.getItem(PROJECTS_STORAGE_KEY) || "[]",
         );
         return stored.find((p) => p.id === id) || null;
+      }
+    },
+
+    detectProject: async (folderPath: string): Promise<DetectedProjectMeta> => {
+      if (projectApi && projectApi.detect) {
+        return await projectApi.detect(folderPath);
+      } else {
+        const parts = folderPath.split(/[/\\]/);
+        const name = parts[parts.length - 1] || "New Project";
+        const lower = folderPath.toLowerCase();
+        const tags: string[] = ["Git"];
+
+        if (lower.includes("react")) tags.push("React");
+        if (lower.includes("next")) tags.push("Next.js");
+        if (lower.includes("node") || lower.includes("server") || lower.includes("api")) tags.push("Node.js");
+        if (lower.includes("express")) tags.push("Express");
+        if (lower.includes("vite")) tags.push("Vite");
+        tags.push("TypeScript");
+        tags.push("npm");
+
+        return {
+          name,
+          tags: Array.from(new Set(tags)),
+          details: {
+            languages: ["TypeScript", "JavaScript"],
+            frameworks: ["React"],
+            packageManager: "npm",
+            hasGit: true,
+            hasDocker: false,
+          },
+        };
       }
     },
 

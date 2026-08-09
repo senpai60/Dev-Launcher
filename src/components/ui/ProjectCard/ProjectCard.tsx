@@ -18,6 +18,7 @@ export interface ProjectCardProps {
   onOpenFolder?: (project: ProjectCardData) => void;
   onOpenVSCode?: (project: ProjectCardData) => void;
   onOpenTerminal?: (project: ProjectCardData) => void;
+  onClickCard?: (project: ProjectCardData) => void;
   menuItems?: ContextMenuItem[];
 }
 
@@ -27,6 +28,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
   onOpenFolder,
   onOpenVSCode,
   onOpenTerminal,
+  onClickCard,
   menuItems = [],
 }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -48,10 +50,22 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
             fill={project.isFavorite ? "#eab308" : "none"}
           />
         </button>
-        <h3 className="card-project-title">{project.name}</h3>
+        <h3
+          className="card-project-title"
+          style={{ cursor: onClickCard ? "pointer" : "default" }}
+          onClick={() => onClickCard && onClickCard(project)}
+        >
+          {project.name}
+        </h3>
       </div>
 
-      <p className="card-tech-stack">{project.tech}</p>
+      <p
+        className="card-tech-stack"
+        style={{ cursor: onClickCard ? "pointer" : "default" }}
+        onClick={() => onClickCard && onClickCard(project)}
+      >
+        {project.tech}
+      </p>
       <p className="card-path">{project.path}</p>
 
       {/* Card Action Buttons & Dynamic Context Menu */}

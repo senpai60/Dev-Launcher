@@ -6,6 +6,19 @@ import type * as HistoryTypes from './history';
 import type * as RuntimeTypes from './runtime';
 import type * as IntegrationTypes from './integration';
 
+export interface DetectedProjectMeta {
+  name: string;
+  tags: string[];
+  description?: string;
+  details: {
+    languages: string[];
+    frameworks: string[];
+    packageManager?: string;
+    hasGit: boolean;
+    hasDocker: boolean;
+  };
+}
+
 declare global {
   type Project = ProjectTypes.Project;
   type ProjectMetadata = ProjectTypes.ProjectMetadata;
@@ -43,6 +56,7 @@ declare global {
         add: (project: Partial<Project>) => Promise<Project>;
         update: (id: string, data: Partial<Project>) => Promise<void>;
         delete: (id: string) => Promise<void>;
+        detect: (folderPath: string) => Promise<DetectedProjectMeta>;
         launch: (id: string, action: string) => Promise<void>;
       };
       groupAPI: {

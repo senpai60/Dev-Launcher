@@ -7,6 +7,7 @@ import {
   deleteProject,
   launchProject,
 } from "../services/project.service";
+import { detectProjectMeta } from "../utils/projectDetector";
 
 export function registerProjectIPC() {
   ipcMain.handle("projects:getAll", () => {
@@ -27,6 +28,10 @@ export function registerProjectIPC() {
 
   ipcMain.handle("projects:delete", (_, id: string) => {
     return deleteProject(id);
+  });
+
+  ipcMain.handle("projects:detect", (_, folderPath: string) => {
+    return detectProjectMeta(folderPath);
   });
 
   ipcMain.handle("projects:launch", async (_, id: string, action: string) => {

@@ -11,6 +11,9 @@ import {
   Edit,
   Trash2,
   FolderOpen,
+  Zap,
+  Info,
+  Cpu,
 } from "lucide-react";
 import PageNavbar from "../../components/layout/navbar/PageNavbar";
 import {
@@ -20,13 +23,17 @@ import {
 import { ContextMenuItem } from "../../components/ui/ContextMenu/ContextMenu";
 import EmptyState from "../../components/ui/EmptyState/EmptyState";
 import Dialog from "../../components/ui/Dialog/Dialog";
+import Drawer from "../../components/ui/Drawer/Drawer";
 import Input from "../../components/ui/Form/Input";
 import Checkbox from "../../components/ui/Form/Checkbox";
 import TagInput from "../../components/ui/Form/TagInput";
 import FolderPicker from "../../components/ui/Form/FolderPicker";
 import { useProjectContext } from "../../context/ProjectContext";
 import { useGroupContext } from "../../context/GroupContext";
+import { useProjectAPI } from "../../api/api";
 import { Project } from "../../../types/project";
+import { DetectedProjectMeta } from "../../../types/global";
+import vscodeIcon from "../../app-icons/vscode.svg";
 import "./projects.css";
 
 const ProjectsPage: React.FC = () => {
@@ -38,6 +45,10 @@ const ProjectsPage: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
 
+  // Drawer State
+  const [selectedDrawerProject, setSelectedDrawerProject] = useState<Project | null>(null);
+  const [drawerMeta, setDrawerMeta] = useState<DetectedProjectMeta | null>(null);
+
   // Form State
   const [formName, setFormName] = useState("");
   const [formPath, setFormPath] = useState("");
@@ -46,6 +57,7 @@ const ProjectsPage: React.FC = () => {
   const [formGroupId, setFormGroupId] = useState("");
   const [formIsFavorite, setFormIsFavorite] = useState(false);
   const [formError, setFormError] = useState("");
+  const [detectedMeta, setDetectedMeta] = useState<DetectedProjectMeta | null>(null);
 
   const projectContext = useProjectContext();
   const allProjects = projectContext?.allProjects;
@@ -59,6 +71,8 @@ const ProjectsPage: React.FC = () => {
   const groups = groupCtx?.groups;
   const loadGroups = groupCtx?.loadGroups;
 
+  const projectApi = useProjectAPI();
+
   useEffect(() => {
     loadAllProjects?.();
     loadGroups?.();
@@ -67,7 +81,6 @@ const ProjectsPage: React.FC = () => {
   useEffect(() => {
     if (actionParam === "create") {
       openCreateDialog();
-      // Clear action param after opening
       searchParams.delete("action");
       setSearchParams(searchParams, { replace: true });
     }
@@ -85,7 +98,6 @@ const ProjectsPage: React.FC = () => {
   } else if (groupParam) {
     sourceProjects = sourceProjects.filter((p) => p.groupId === groupParam);
   } else {
-    // All projects mode: favorites sorted first, then by last opened / updated date
     sourceProjects = sourceProjects.sort((a, b) => {
       if (a.isFavorite && !b.isFavorite) return -1;
       if (!a.isFavorite && b.isFavorite) return 1;
@@ -93,7 +105,6 @@ const ProjectsPage: React.FC = () => {
     });
   }
 
-  // Map real projects from context
   const projects: ProjectCardData[] = sourceProjects.map((p) => ({
     id: p.id,
     name: p.name,
@@ -110,7 +121,43 @@ const ProjectsPage: React.FC = () => {
     setFormGroupId(groupParam || "");
     setFormIsFavorite(false);
     setFormError("");
+    setDetectedMeta(null);
     setIsCreateOpen(true);
+  };
+
+  const handleOpenDrawer = async (cardData: ProjectCardData) => {
+    const fullProj = (allProjects || []).find((p) => p.id === cardData.id);
+    if (!fullProj) return;
+
+    setSelectedDrawerProject(fullProj);
+    setDrawerMeta(null);
+
+    try {
+      const meta = await projectApi.detectProject(fullProj.path);
+      setDrawerMeta(meta);
+    } catch (e) {
+      console.error("Error auto-detecting meta for drawer:", e);
+    }
+  };
+
+  const handleFolderChange = async (selectedPath: string, extractedName?: string) => {
+    setFormPath(selectedPath);
+    if (selectedPath) {
+      setFormError("");
+      try {
+        const meta = await projectApi.detectProject(selectedPath);
+        if (meta) {
+          setDetectedMeta(meta);
+          if (meta.name) setFormName(meta.name);
+          if (meta.tags && meta.tags.length > 0) setFormTags(meta.tags);
+          if (meta.description) setFormDescription(meta.description);
+        }
+      } catch (err) {
+        if (extractedName) setFormName(extractedName);
+      }
+    } else {
+      setDetectedMeta(null);
+    }
   };
 
   const handleFormSubmit = async (e: React.FormEvent) => {
@@ -160,6 +207,13 @@ const ProjectsPage: React.FC = () => {
   );
 
   const getDynamicMenuItems = (project: ProjectCardData): ContextMenuItem[] => [
+    {
+      id: "details",
+      label: "View Phase 4 Details",
+      icon: <Info size={14} />,
+      onClick: () => handleOpenDrawer(project),
+    },
+    { id: "div0", isDivider: true },
     {
       id: "vscode",
       label: "Open in VS Code",
@@ -222,6 +276,8 @@ const ProjectsPage: React.FC = () => {
     return "Projects / All Projects";
   };
 
+  const assignedGroup = (groups || []).find((g) => g.id === selectedDrawerProject?.groupId);
+
   return (
     <section className="projects-page">
       <PageNavbar title={getPageTitle()}>
@@ -247,7 +303,7 @@ const ProjectsPage: React.FC = () => {
           />
         </div>
 
-        {/* Real Projects Grid OR Centered Empty State when 0 projects exist */}
+        {/* Real Projects Grid OR Centered Empty State */}
         {filteredProjects.length === 0 ? (
           <EmptyState
             icon={<FolderOpen size={32} strokeWidth={1.5} />}
@@ -272,6 +328,7 @@ const ProjectsPage: React.FC = () => {
               <ProjectCard
                 key={project.id}
                 project={project}
+                onClickCard={handleOpenDrawer}
                 onToggleFavorite={toggleFavorite}
                 onOpenFolder={(p) => openProject?.(p.id, "folder")}
                 onOpenVSCode={(p) => openProject?.(p.id, "vscode")}
@@ -283,7 +340,147 @@ const ProjectsPage: React.FC = () => {
         )}
       </div>
 
-      {/* REUSABLE DIALOG & NEW PROJECT FORM */}
+      {/* SHARED DRAWER — PHASE 4 PROJECT DETAILS */}
+      <Drawer
+        isOpen={Boolean(selectedDrawerProject)}
+        onClose={() => setSelectedDrawerProject(null)}
+        title={selectedDrawerProject?.name}
+        subtitle={selectedDrawerProject?.path}
+        width="480px"
+      >
+        {selectedDrawerProject && (
+          <>
+            {/* Quick Actions Bar */}
+            <div style={{ display: "flex", gap: "var(--space-2)" }}>
+              <button
+                className="action-btn text-button"
+                style={{ flex: 1, padding: "8px", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6 }}
+                onClick={() => openProject?.(selectedDrawerProject.id, "vscode")}
+              >
+                <img src={vscodeIcon} alt="VS Code" style={{ width: 14, height: 14 }} />
+                <span>VS Code</span>
+              </button>
+              <button
+                className="action-btn text-button"
+                style={{ flex: 1, padding: "8px", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6 }}
+                onClick={() => openProject?.(selectedDrawerProject.id, "terminal")}
+              >
+                <Terminal size={14} />
+                <span>Terminal</span>
+              </button>
+              <button
+                className="action-btn text-button"
+                style={{ flex: 1, padding: "8px", display: "inline-flex", alignItems: "center", gap: 6, justifyContent: "center" }}
+                onClick={() => openProject?.(selectedDrawerProject.id, "folder")}
+              >
+                <Folder size={14} />
+                <span>Folder</span>
+              </button>
+            </div>
+
+            {/* Section 1: Auto-Detected Tech Stack & Tags */}
+            <div className="drawer-section">
+              <span className="drawer-section-title">
+                <Zap size={14} style={{ color: "#f59e0b" }} />
+                <span>Phase 4 Auto-Detected Tech Stack</span>
+              </span>
+              <div className="drawer-tags-list">
+                {(drawerMeta?.tags || selectedDrawerProject.tags || ["JavaScript"]).map((tag) => (
+                  <span key={tag} className="drawer-tag-pill">
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            {/* Section 2: Detailed System Breakdown */}
+            <div className="drawer-section">
+              <span className="drawer-section-title">
+                <Cpu size={14} />
+                <span>Detected Toolchain & Environment</span>
+              </span>
+              <div className="drawer-meta-grid">
+                <div className="drawer-meta-item">
+                  <span className="drawer-meta-label">Languages</span>
+                  <span className="drawer-meta-val">
+                    {drawerMeta?.details.languages.join(", ") || "JavaScript"}
+                  </span>
+                </div>
+
+                <div className="drawer-meta-item">
+                  <span className="drawer-meta-label">Frameworks</span>
+                  <span className="drawer-meta-val">
+                    {drawerMeta?.details.frameworks.join(", ") || "None"}
+                  </span>
+                </div>
+
+                <div className="drawer-meta-item">
+                  <span className="drawer-meta-label">Package Manager</span>
+                  <span className="drawer-meta-val">
+                    {drawerMeta?.details.packageManager || "npm"}
+                  </span>
+                </div>
+
+                <div className="drawer-meta-item">
+                  <span className="drawer-meta-label">Git Control</span>
+                  <span className="drawer-meta-val" style={{ color: drawerMeta?.details.hasGit ? "#10b981" : "var(--text-tertiary)" }}>
+                    {drawerMeta?.details.hasGit ? "● Active (.git)" : "Not initialized"}
+                  </span>
+                </div>
+
+                <div className="drawer-meta-item">
+                  <span className="drawer-meta-label">Docker Infra</span>
+                  <span className="drawer-meta-val" style={{ color: drawerMeta?.details.hasDocker ? "#10b981" : "var(--text-tertiary)" }}>
+                    {drawerMeta?.details.hasDocker ? "● Detected" : "Not detected"}
+                  </span>
+                </div>
+
+                <div className="drawer-meta-item">
+                  <span className="drawer-meta-label">Collection Group</span>
+                  <span className="drawer-meta-val">
+                    {assignedGroup ? assignedGroup.name : "Unassigned"}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Section 3: File Location & Path */}
+            <div className="drawer-section">
+              <span className="drawer-section-title">
+                <FolderOpen size={14} />
+                <span>Filesystem Location</span>
+              </span>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                <span className="drawer-subtitle" style={{ fontSize: "var(--text-xs)" }}>
+                  {selectedDrawerProject.path}
+                </span>
+                <button
+                  className="action-btn text-button"
+                  style={{ padding: "4px 8px", fontSize: "var(--text-xs)" }}
+                  onClick={() => navigator.clipboard.writeText(selectedDrawerProject.path)}
+                >
+                  <Copy size={13} />
+                </button>
+              </div>
+            </div>
+
+            {/* Section 4: Metadata & Timestamps */}
+            {selectedDrawerProject.description && (
+              <div className="drawer-section">
+                <span className="drawer-section-title">
+                  <Info size={14} />
+                  <span>Description</span>
+                </span>
+                <p className="text-meta" style={{ fontSize: "var(--text-sm)", lineHeight: "var(--lh-ui)" }}>
+                  {selectedDrawerProject.description}
+                </p>
+              </div>
+            )}
+          </>
+        )}
+      </Drawer>
+
+      {/* REUSABLE DIALOG & NEW PROJECT FORM WITH AUTO DETECTION */}
       <Dialog
         isOpen={isCreateOpen}
         onClose={() => setIsCreateOpen(false)}
@@ -310,15 +507,31 @@ const ProjectsPage: React.FC = () => {
           <FolderPicker
             label="Project Location"
             value={formPath}
-            onChange={(selectedPath, extractedName) => {
-              setFormPath(selectedPath);
-              if (extractedName) {
-                setFormName(extractedName);
-              }
-              if (selectedPath) setFormError("");
-            }}
+            onChange={handleFolderChange}
             error={formError && !formPath ? formError : undefined}
           />
+
+          {detectedMeta && (
+            <div
+              style={{
+                backgroundColor: "var(--button-inside)",
+                border: "1px solid var(--bg-tirtiary)",
+                borderRadius: "8px",
+                padding: "8px 12px",
+                marginBottom: "var(--space-4)",
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                fontSize: "var(--text-xs)",
+                color: "var(--text-primary)",
+              }}
+            >
+              <Zap size={14} style={{ color: "#f59e0b", flexShrink: 0 }} />
+              <span>
+                Auto-detected: <strong>{detectedMeta.tags.join(" · ")}</strong>
+              </span>
+            </div>
+          )}
 
           <Input
             label="Project Name"

@@ -6,23 +6,24 @@ import type * as HistoryTypes from './history';
 import type * as RuntimeTypes from './runtime';
 import type * as IntegrationTypes from './integration';
 
-export interface DetectedProjectMeta {
+/** Result of validating a command configuration in the main process. */
+export interface CommandValidationResult {
+  valid: boolean;
+  errors: string[];
+  requiresConfirmation: boolean;
+  destructiveReason?: string;
+}
+
+export interface SelectedFolder {
+  path: string;
   name: string;
-  tags: string[];
-  description?: string;
-  commands: ProjectTypes.ProjectCommand[];
-  details: {
-    languages: string[];
-    frameworks: string[];
-    packageManager?: string;
-    hasGit: boolean;
-    hasDocker: boolean;
-  };
 }
 
 declare global {
   type Project = ProjectTypes.Project;
+  type ProjectWithStatus = ProjectTypes.ProjectWithStatus;
   type ProjectMetadata = ProjectTypes.ProjectMetadata;
+  type DetectedProjectMeta = ProjectTypes.DetectedProjectMeta;
   type ProjectGroup = GroupTypes.ProjectGroup;
   type ProjectCommand = ProjectTypes.ProjectCommand;
   type ProjectUrl = ProjectTypes.ProjectUrl;
@@ -52,14 +53,46 @@ declare global {
   interface Window {
     api: {
       projectAPI: {
-        getAll: () => Promise<Project[]>;
-        get: (id: string) => Promise<Project>;
-        add: (project: Partial<Project>) => Promise<Project>;
-        update: (id: string, data: Partial<Project>) => Promise<void>;
-        delete: (id: string) => Promise<void>;
+        getAll: () => Promise<ProjectWithStatus[]>;
+        get: (id: string) => Promise<ProjectWithStatus | undefined>;
+        add: (project: Partial<Project>) => Promise<ProjectWithStatus>;
+        update: (id: string, data: Partial<Project>) => Promise<ProjectWithStatus>;
+        delete: (id: string) => Promise<boolean>;
         detect: (folderPath: string) => Promise<DetectedProjectMeta>;
-        runCustomCommand: (cmdString: string, projectPath: string) => Promise<void>;
-        launch: (id: string, action: string) => Promise<void>;
+
+        seedCommands: (
+          projectId: string,
+          commands: ProjectCommand[],
+        ) => Promise<ProjectWithStatus>;
+        addCommand: (
+          projectId: string,
+          command: Partial<ProjectCommand>,
+        ) => Promise<{ project: ProjectWithStatus; command: ProjectCommand }>;
+        updateCommand: (
+          projectId: string,
+          commandId: string,
+          updates: Partial<ProjectCommand>,
+        ) => Promise<{ project: ProjectWithStatus; command: ProjectCommand }>;
+        deleteCommand: (projectId: string, commandId: string) => Promise<ProjectWithStatus>;
+        runCommand: (
+          projectId: string,
+          commandId: string,
+          confirmedDestructive?: boolean,
+        ) => Promise<ProjectWithStatus>;
+        inspectCommand: (
+          projectId: string,
+          commandId: string,
+        ) => Promise<CommandValidationResult>;
+        validateCommand: (
+          draft: Partial<ProjectCommand>,
+          projectPath?: string,
+        ) => Promise<CommandValidationResult>;
+
+        launch: (
+          id: string,
+          action: string,
+          newWindow?: boolean,
+        ) => Promise<ProjectWithStatus>;
       };
       groupAPI: {
         getAll: () => Promise<ProjectGroup[]>;
@@ -67,6 +100,11 @@ declare global {
         add: (group: Partial<ProjectGroup>) => Promise<ProjectGroup>;
         update: (id: string, data: Partial<ProjectGroup>) => Promise<void>;
         delete: (id: string) => Promise<void>;
+      };
+      systemAPI: {
+        selectFolder: (defaultPath?: string) => Promise<SelectedFolder | null>;
+        pathExists: (target: string) => Promise<boolean>;
+        openExternal: (url: string) => Promise<boolean>;
       };
     };
   }

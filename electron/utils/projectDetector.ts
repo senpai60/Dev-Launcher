@@ -1,19 +1,68 @@
 import fs from "fs";
 import path from "path";
-import { ProjectCommand } from "../../types/project";
+import { createHash } from "node:crypto";
+import type { DetectedProjectMeta, ProjectCommand } from "../../types/project";
 
-export interface DetectedProjectMeta {
-  name: string;
-  tags: string[];
-  description?: string;
-  commands: ProjectCommand[];
-  details: {
-    languages: string[];
-    frameworks: string[];
-    packageManager?: string;
-    hasGit: boolean;
-    hasDocker: boolean;
-  };
+export type { DetectedProjectMeta };
+
+/**
+ * Derives a command id from its content instead of the clock.
+ *
+ * Detection runs every time a project's detail view opens; timestamp-based ids
+ * would produce a different id each run, which breaks edit and delete as soon
+ * as those act on a detected command.
+ */
+/**
+ * Best-effort starting command for projects without a package.json.
+ * Returns null rather than inventing an `npm start` for a Rust crate.
+ */
+function fallbackCommand(
+  folderPath: string,
+): { name: string; command: string; description: string } | null {
+  const has = (relative: string) => fs.existsSync(path.join(folderPath, relative));
+
+  if (has("Cargo.toml")) {
+    return { name: "Run", command: "cargo run", description: "Build and run the crate" };
+  }
+  if (has("go.mod")) {
+    return { name: "Run", command: "go run .", description: "Build and run the module" };
+  }
+  if (has("manage.py")) {
+    return {
+      name: "Start Dev Server",
+      command: "python manage.py runserver",
+      description: "Start the Django development server",
+    };
+  }
+  if (has("requirements.txt") || has("pyproject.toml") || has("Pipfile")) {
+    return { name: "Run", command: "python main.py", description: "Run the entry point" };
+  }
+  if (has("pom.xml")) {
+    return { name: "Run", command: "mvn spring-boot:run", description: "Run via Maven" };
+  }
+  if (has("build.gradle") || has("build.gradle.kts")) {
+    return { name: "Run", command: "gradle run", description: "Run via Gradle" };
+  }
+  if (has("docker-compose.yml") || has("docker-compose.yaml") || has("compose.yml")) {
+    return {
+      name: "Compose Up",
+      command: "docker compose up",
+      description: "Start the Compose stack",
+    };
+  }
+  if (has("Makefile")) {
+    return { name: "Make", command: "make", description: "Run the default make target" };
+  }
+
+  return null;
+}
+
+function stableCommandId(folderPath: string, name: string, command: string): string {
+  const digest = createHash("sha1")
+    .update(`${path.resolve(folderPath)}::${name}::${command}`)
+    .digest("hex")
+    .slice(0, 12);
+  return `cmd_${digest}`;
 }
 
 export function detectProjectMeta(folderPath: string): DetectedProjectMeta {
@@ -131,86 +180,72 @@ export function detectProjectMeta(folderPath: string): DetectedProjectMeta {
         tagsSet.add("npm");
       }
 
-      // Auto-detect commands from package.json scripts!
+      // Auto-detect commands from package.json scripts
       if (content.scripts && typeof content.scripts === "object") {
-        const scripts = content.scripts;
+        const scripts = content.scripts as Record<string, string>;
         const now = Date.now();
 
-        if (scripts.dev) {
+        const addCommand = (
+          name: string,
+          command: string,
+          description: string,
+          isFavorite: boolean,
+        ) => {
           commands.push({
-            id: `cmd_dev_${now}`,
-            name: "Start Dev Server",
-            command: `${pmPrefix} dev`,
-            description: "Launch local development server",
-            isFavorite: true,
+            id: stableCommandId(folderPath, name, command),
+            name,
+            command,
+            description,
+            isFavorite,
             createdAt: now,
             updatedAt: now,
           });
-        } else if (scripts.start) {
-          commands.push({
-            id: `cmd_start_${now}`,
-            name: "Start Application",
-            command: `${pmPrefix} start`,
-            description: "Start application process",
-            isFavorite: true,
-            createdAt: now,
-            updatedAt: now,
-          });
+        };
+
+        // Recognised scripts get friendly names and a sensible favourite.
+        const known: Array<[string, string, string, boolean]> = [
+          ["dev", "Start Dev Server", "Launch local development server", true],
+          ["start", "Start Application", "Start application process", !scripts.dev],
+          ["build", "Build Production Bundle", "Compile production distribution assets", false],
+          ["test", "Run Test Suite", "Execute test scripts", false],
+          ["lint", "Lint & Format", "Run code linter", false],
+          ["typecheck", "Type Check", "Run the TypeScript compiler", false],
+          ["preview", "Preview Build", "Serve the production build locally", false],
+        ];
+
+        for (const [script, label, description, isFavorite] of known) {
+          if (scripts[script]) {
+            addCommand(label, `${pmPrefix} ${script}`, description, isFavorite);
+          }
         }
 
-        if (scripts.build) {
-          commands.push({
-            id: `cmd_build_${now}`,
-            name: "Build Production Bundle",
-            command: `${pmPrefix} build`,
-            description: "Compile production distribution assets",
-            isFavorite: false,
-            createdAt: now,
-            updatedAt: now,
-          });
-        }
-
-        if (scripts.test) {
-          commands.push({
-            id: `cmd_test_${now}`,
-            name: "Run Test Suite",
-            command: `${pmPrefix} test`,
-            description: "Execute test scripts",
-            isFavorite: false,
-            createdAt: now,
-            updatedAt: now,
-          });
-        }
-
-        if (scripts.lint) {
-          commands.push({
-            id: `cmd_lint_${now}`,
-            name: "Lint & Format",
-            command: `${pmPrefix} lint`,
-            description: "Run code linter",
-            isFavorite: false,
-            createdAt: now,
-            updatedAt: now,
-          });
+        // Anything else in `scripts` is still worth surfacing -- the user knows
+        // what `db:seed` does even if we do not.
+        const claimed = new Set(known.map(([script]) => script));
+        for (const script of Object.keys(scripts)) {
+          if (claimed.has(script)) continue;
+          if (script.startsWith("pre") || script.startsWith("post")) continue;
+          addCommand(script, `${pmPrefix} ${script}`, `Run the "${script}" script`, false);
         }
       }
     } catch (e) {
-      // Ignore JSON parse errors
+      console.warn(`Could not parse package.json in ${folderPath}:`, e);
     }
   }
 
-  // Fallback default commands if no scripts were detected
+  // Non-Node projects still deserve a starting point.
   if (commands.length === 0) {
     const now = Date.now();
-    commands.push({
-      id: `cmd_default_${now}`,
-      name: "Start Application",
-      command: `${pmPrefix} start`,
-      description: "Default application start command",
-      isFavorite: true,
-      createdAt: now,
-      updatedAt: now,
-    });
+    const fallback = fallbackCommand(folderPath);
+    if (fallback) {
+      commands.push({
+        id: stableCommandId(folderPath, fallback.name, fallback.command),
+        ...fallback,
+        isFavorite: true,
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
   }
 
   // 5. Detect Python

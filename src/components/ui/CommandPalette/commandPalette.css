@@ -158,6 +158,14 @@
   white-space: nowrap;
 }
 
+.cmd-palette-no-results {
+  padding: var(--space-5);
+  text-align: center;
+  font-family: var(--font-ui);
+  font-size: var(--text-base);
+  color: var(--text-tertiary);
+}
+
 .cmd-item-action-badge {
   font-family: var(--font-ui);
   font-size: var(--text-xs);

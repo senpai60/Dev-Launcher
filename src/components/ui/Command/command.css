@@ -1,0 +1,228 @@
+/* ---- Command row ---------------------------------------------------- */
+
+.command-row {
+  background-color: var(--card-surface);
+  border: 1px solid var(--bg-tirtiary);
+  border-radius: 8px;
+  padding: var(--space-3);
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  transition: border-color 0.2s ease;
+}
+
+.command-row:hover {
+  border-color: var(--text-tertiary);
+}
+
+.command-row.is-disabled {
+  opacity: 0.55;
+}
+
+.command-row-main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+  flex: 1;
+}
+
+.command-row-heading {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.command-fav-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.command-fav-btn.is-favorite {
+  color: #eab308;
+}
+
+.command-fav-btn:hover {
+  color: #fde047;
+}
+
+.command-name {
+  font-family: var(--font-ui);
+  font-size: var(--text-base);
+  font-weight: var(--font-medium);
+  color: var(--text-primary);
+}
+
+.command-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background-color: var(--button-inside);
+  border: 1px solid var(--bg-tirtiary);
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-family: var(--font-ui);
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+}
+
+.command-badge-danger {
+  background-color: rgba(239, 68, 68, 0.12);
+  border-color: rgba(239, 68, 68, 0.35);
+  color: #f87171;
+}
+
+.command-string {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.command-description {
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  line-height: var(--lh-ui);
+}
+
+.command-meta-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.command-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-ui);
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+
+.command-row-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex-shrink: 0;
+}
+
+.command-run-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background-color: var(--button-inside);
+  color: var(--text-primary);
+  border: 1px solid var(--bg-tirtiary);
+  border-radius: 6px;
+  padding: 5px 11px;
+  font-family: var(--font-ui);
+  font-size: var(--text-xs);
+  font-weight: var(--font-medium);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.command-run-btn:hover:not(:disabled) {
+  background-color: var(--accent-surface);
+  border-color: var(--accent-primary);
+  color: var(--text-primary);
+}
+
+.command-run-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.command-menu-btn {
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  padding: 3px 7px;
+  font-size: var(--text-base);
+  line-height: 1;
+}
+
+.command-menu-btn:hover {
+  background-color: var(--button-inside);
+  color: var(--text-primary);
+}
+
+/* ---- Command form alerts -------------------------------------------- */
+
+.command-form-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  border-radius: 6px;
+  padding: var(--space-3);
+  margin-top: var(--space-2);
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  line-height: var(--lh-ui);
+}
+
+.command-form-alert > svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.command-form-alert div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.command-form-alert-error {
+  background-color: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #f87171;
+}
+
+.command-form-alert-warning {
+  background-color: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  color: #fbbf24;
+}
+
+/* ---- Command list container ----------------------------------------- */
+
+.command-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.command-list-empty {
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  color: var(--text-tertiary);
+  font-style: italic;
+}
+
+.command-group-heading {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-family: var(--font-ui);
+  font-size: var(--text-xs);
+  font-weight: var(--font-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-tertiary);
+  margin-top: var(--space-2);
+}

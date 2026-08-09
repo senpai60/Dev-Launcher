@@ -49,6 +49,22 @@
   border-color: var(--text-secondary);
 }
 
+/* Auto-detection banner in the create/edit dialog */
+.detected-banner {
+  background-color: var(--button-inside);
+  border: 1px solid var(--bg-tirtiary);
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin-bottom: var(--space-4);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-family: var(--font-ui);
+  font-size: var(--text-xs);
+  color: var(--text-primary);
+  line-height: var(--lh-ui);
+}
+
 /* Project Cards Grid */
 .projects-grid {
   display: grid;

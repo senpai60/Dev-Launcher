@@ -170,9 +170,51 @@
   border: 1px solid var(--bg-tirtiary);
 }
 
+.process-item:hover {
+  border-color: var(--text-tertiary);
+}
+
 @keyframes pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.5; }
+}
+
+/* Empty / degraded dashboard states */
+.dashboard-empty-text {
+  font-family: var(--font-ui);
+  font-size: var(--text-base);
+  color: var(--text-tertiary);
+  line-height: var(--lh-ui);
+}
+
+.dashboard-empty-text kbd {
+  background-color: var(--button-inside);
+  border: 1px solid var(--bg-tirtiary);
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+}
+
+.dashboard-empty-card {
+  border-style: dashed;
+}
+
+.dashboard-warning {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: var(--space-2);
+  font-family: var(--font-ui);
+  font-size: var(--text-xs);
+  color: #f87171;
+}
+
+.primary-action-btn:disabled,
+.icon-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .status-dot {

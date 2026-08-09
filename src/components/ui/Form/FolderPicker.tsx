@@ -1,5 +1,7 @@
-import React, { useRef } from "react";
-import { FolderOpen, Folder } from "lucide-react";
+import React, { useState } from "react";
+import { Folder, FolderOpen } from "lucide-react";
+import { useSystemAPI } from "../../../api/api";
+import { describeError, useToast } from "../Toast/ToastContext";
 import "./form.css";
 
 export interface FolderPickerProps {
@@ -11,6 +13,14 @@ export interface FolderPickerProps {
   className?: string;
 }
 
+/**
+ * Native directory picker.
+ *
+ * Uses Electron's `showOpenDialog` rather than `<input webkitdirectory>`. The
+ * old approach enumerated every file in the tree and derived the folder by
+ * stripping the filename off the first result, which silently returned a
+ * nested subdirectory whenever that file was not at the root.
+ */
 export const FolderPicker: React.FC<FolderPickerProps> = ({
   label = "Project Location",
   value,
@@ -19,36 +29,22 @@ export const FolderPicker: React.FC<FolderPickerProps> = ({
   error,
   className = "",
 }) => {
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const system = useSystemAPI();
+  const toast = useToast();
+  const [isPicking, setIsPicking] = useState(false);
 
-  const handleBrowseClick = () => {
-    if (fileInputRef.current) {
-      fileInputRef.current.click();
-    }
-  };
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (files && files.length > 0) {
-      const firstFile = files[0];
-      const rawPath = (firstFile as any).path || firstFile.webkitRelativePath || firstFile.name;
-
-      let folderPath = "";
-      let folderName = "";
-
-      if ((firstFile as any).path) {
-        // Absolute path in Electron
-        const pathParts = rawPath.split(/[/\\]/);
-        pathParts.pop(); // Remove file name to get directory
-        folderPath = pathParts.join("\\");
-        folderName = pathParts[pathParts.length - 1] || "";
-      } else {
-        const parts = firstFile.webkitRelativePath.split('/');
-        folderName = parts[0] || firstFile.name;
-        folderPath = `C:\\Projects\\${folderName}`;
+  const handleBrowseClick = async () => {
+    if (isPicking) return;
+    setIsPicking(true);
+    try {
+      const selected = await system.selectFolder(value || undefined);
+      if (selected) {
+        onChange(selected.path, selected.name);
       }
-
-      onChange(folderPath, folderName);
+    } catch (e) {
+      toast.error("Could not open the folder picker", describeError(e));
+    } finally {
+      setIsPicking(false);
     }
   };
 
@@ -59,11 +55,14 @@ export const FolderPicker: React.FC<FolderPickerProps> = ({
         {value ? (
           <div className="folder-selected-display">
             <Folder size={18} className="folder-icon" />
-            <span className="folder-path-text">{value}</span>
+            <span className="folder-path-text" title={value}>
+              {value}
+            </span>
             <button
               type="button"
               className="folder-change-btn"
               onClick={handleBrowseClick}
+              disabled={isPicking}
             >
               Change...
             </button>
@@ -73,21 +72,12 @@ export const FolderPicker: React.FC<FolderPickerProps> = ({
             type="button"
             className="folder-select-btn"
             onClick={handleBrowseClick}
+            disabled={isPicking}
           >
             <FolderOpen size={18} />
-            <span>{placeholder}</span>
+            <span>{isPicking ? "Opening picker..." : placeholder}</span>
           </button>
         )}
-
-        <input
-          type="file"
-          ref={fileInputRef}
-          style={{ display: "none" }}
-          /* @ts-ignore */
-          webkitdirectory=""
-          directory=""
-          onChange={handleFileChange}
-        />
       </div>
       {error && <span className="form-error">{error}</span>}
     </div>

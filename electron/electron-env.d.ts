@@ -21,7 +21,5 @@ declare namespace NodeJS {
   }
 }
 
-// Used in Renderer process, expose in `preload.ts`
-interface Window {
-  ipcRenderer: import('electron').IpcRenderer
-}
+// The renderer surface is declared in `types/global.d.ts`. Raw `ipcRenderer` is
+// deliberately not exposed -- see `electron/preload.ts`.

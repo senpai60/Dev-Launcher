@@ -1,31 +1,45 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  Search,
-  FolderClosed,
+  AppWindow,
   Code2,
-  Terminal,
+  Container,
+  CornerDownLeft,
+  FolderClosed,
+  FolderOpen,
+  GitBranch,
   Home,
   LayoutGrid,
-  GitBranch,
-  Container,
-  Settings,
-  AppWindow,
+  Play,
   Plus,
-  FolderOpen,
-  CornerDownLeft,
+  Search,
+  Settings,
 } from "lucide-react";
 import { useProjectContext } from "../../../context/ProjectContext";
+import { useCommandRunner } from "../../../hooks/useCommandRunner";
+import { fuzzyScoreFields } from "../../../utils/fuzzy";
 import "./commandPalette.css";
+
+type PaletteCategory = "Commands" | "Projects" | "Quick Actions" | "Navigation";
 
 export type CommandPaletteItem = {
   id: string;
   title: string;
   subtitle?: string;
-  category: "Projects" | "Quick Actions" | "Navigation";
+  category: PaletteCategory;
+  /** Extra text matched against the query but not displayed. */
+  keywords?: string;
+  badge?: string;
   icon: React.ReactNode;
   action: () => void;
 };
+
+const CATEGORY_ORDER: PaletteCategory[] = [
+  "Commands",
+  "Projects",
+  "Quick Actions",
+  "Navigation",
+];
 
 export const CommandPalette: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -34,12 +48,14 @@ export const CommandPalette: React.FC = () => {
 
   const navigate = useNavigate();
   const projectCtx = useProjectContext();
+  const { requestRun, confirmElement } = useCommandRunner();
+
   const allProjects = projectCtx?.allProjects;
   const openProject = projectCtx?.openProject;
 
   const inputRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
 
-  // Global Keyboard Listener for Ctrl+K / Cmd+K
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
@@ -51,296 +67,277 @@ export const CommandPalette: React.FC = () => {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
-  // Reset search and focus input when palette opens
   useEffect(() => {
     if (isOpen) {
       setSearchQuery("");
       setSelectedIndex(0);
-      setTimeout(() => inputRef.current?.focus(), 50);
+      window.setTimeout(() => inputRef.current?.focus(), 50);
     }
   }, [isOpen]);
 
-  // Build command palette items
-  const items: CommandPaletteItem[] = [];
+  const close = () => setIsOpen(false);
 
-  // 1. Projects
-  if (allProjects && allProjects.length > 0) {
-    allProjects.forEach((p) => {
-      items.push({
-        id: `proj_${p.id}`,
-        title: p.name,
-        subtitle: p.tags?.join(" · ") || p.path,
+  /**
+   * Built once per project-list change rather than on every keystroke.
+   */
+  const items = useMemo<CommandPaletteItem[]>(() => {
+    const list: CommandPaletteItem[] = [];
+    const projects = allProjects ?? [];
+
+    // 1. Runnable project commands -- the core Phase 5 palette entry.
+    for (const project of projects) {
+      for (const command of project.commands ?? []) {
+        list.push({
+          id: `cmd_${project.id}_${command.id}`,
+          title: `${command.name} · ${project.name}`,
+          subtitle: command.command,
+          category: "Commands",
+          keywords: `${command.description ?? ""} ${project.tags?.join(" ") ?? ""}`,
+          badge: project.pathExists ? "Run" : "Folder missing",
+          icon: <Play size={18} />,
+          action: () => {
+            close();
+            if (project.pathExists) void requestRun(project, command);
+          },
+        });
+      }
+    }
+
+    // 2. Projects
+    for (const project of projects) {
+      list.push({
+        id: `proj_${project.id}`,
+        title: project.name,
+        subtitle: project.tags?.join(" · ") || project.path,
         category: "Projects",
+        keywords: project.path,
+        badge: "Open Code",
         icon: <FolderClosed size={18} />,
         action: () => {
-          openProject?.(p.id, "vscode");
-          setIsOpen(false);
+          close();
+          void openProject?.(project.id, "vscode");
         },
       });
+    }
+
+    // 3. Quick actions
+    list.push({
+      id: "action_new_project",
+      title: "Create New Project",
+      subtitle: "Add a project location to your workspace",
+      category: "Quick Actions",
+      icon: <Plus size={18} />,
+      action: () => {
+        close();
+        navigate("/projects?action=create");
+      },
     });
-  }
 
-  // 2. Quick Actions
-  items.push({
-    id: "action_new_project",
-    title: "Create New Project",
-    subtitle: "Add a project location to workspace",
-    category: "Quick Actions",
-    icon: <Plus size={18} />,
-    action: () => {
-      navigate("/projects?action=create");
-      setIsOpen(false);
-    },
-  });
+    // Previously these targeted `allProjects[0]`, which opened an arbitrary
+    // project. They now route to the list so the user picks one.
+    list.push({
+      id: "action_open_folder",
+      title: "Open a Project Folder",
+      subtitle: "Browse your projects and reveal one in Explorer",
+      category: "Quick Actions",
+      icon: <FolderOpen size={18} />,
+      action: () => {
+        close();
+        navigate("/projects");
+      },
+    });
 
-  items.push({
-    id: "action_open_folder",
-    title: "Open Folder in Explorer",
-    subtitle: "Browse local directory",
-    category: "Quick Actions",
-    icon: <FolderOpen size={18} />,
-    action: () => {
-      if (allProjects && allProjects.length > 0) {
-        openProject?.(allProjects[0].id, "folder");
-      }
-      setIsOpen(false);
-    },
-  });
+    list.push({
+      id: "action_favorites",
+      title: "Show Favorite Projects",
+      subtitle: "Jump to your starred projects",
+      category: "Quick Actions",
+      icon: <FolderClosed size={18} />,
+      action: () => {
+        close();
+        navigate("/projects?filter=favorites");
+      },
+    });
 
-  items.push({
-    id: "action_terminal",
-    title: "Open Terminal",
-    subtitle: "Launch command prompt / terminal",
-    category: "Quick Actions",
-    icon: <Terminal size={18} />,
-    action: () => {
-      if (allProjects && allProjects.length > 0) {
-        openProject?.(allProjects[0].id, "terminal");
-      }
-      setIsOpen(false);
-    },
-  });
+    // 4. Navigation
+    const navItems: Array<[string, string, React.ReactNode]> = [
+      ["/", "Go to Dashboard", <Home size={18} key="h" />],
+      ["/projects", "Go to Projects", <FolderClosed size={18} key="p" />],
+      ["/commands", "Go to Commands", <Code2 size={18} key="c" />],
+      ["/apps", "Go to Apps & Tools", <AppWindow size={18} key="a" />],
+      ["/workspaces", "Go to Workspaces", <LayoutGrid size={18} key="w" />],
+      ["/git", "Go to Git", <GitBranch size={18} key="g" />],
+      ["/docker", "Go to Docker", <Container size={18} key="d" />],
+      ["/settings", "Go to Settings", <Settings size={18} key="s" />],
+    ];
 
-  // 3. Navigation
-  items.push({
-    id: "nav_home",
-    title: "Go to Dashboard / Home",
-    category: "Navigation",
-    icon: <Home size={18} />,
-    action: () => {
-      navigate("/");
-      setIsOpen(false);
-    },
-  });
+    for (const [path, title, icon] of navItems) {
+      list.push({
+        id: `nav_${path}`,
+        title,
+        category: "Navigation",
+        icon,
+        action: () => {
+          close();
+          navigate(path);
+        },
+      });
+    }
 
-  items.push({
-    id: "nav_projects",
-    title: "Go to Projects",
-    category: "Navigation",
-    icon: <FolderClosed size={18} />,
-    action: () => {
-      navigate("/projects");
-      setIsOpen(false);
-    },
-  });
+    return list;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allProjects]);
 
-  items.push({
-    id: "nav_apps",
-    title: "Go to Apps & Tools",
-    category: "Navigation",
-    icon: <AppWindow size={18} />,
-    action: () => {
-      navigate("/apps");
-      setIsOpen(false);
-    },
-  });
+  /** Fuzzy-ranked, then regrouped so categories stay in a stable order. */
+  const { grouped, flatItems } = useMemo(() => {
+    const query = searchQuery.trim();
 
-  items.push({
-    id: "nav_workspaces",
-    title: "Go to Workspaces",
-    category: "Navigation",
-    icon: <LayoutGrid size={18} />,
-    action: () => {
-      navigate("/workspaces");
-      setIsOpen(false);
-    },
-  });
+    const matched = query
+      ? items
+          .map((item) => ({
+            item,
+            score: fuzzyScoreFields(
+              [item.title, item.subtitle, item.keywords, item.category],
+              query,
+            ),
+          }))
+          .filter((e): e is { item: CommandPaletteItem; score: number } => e.score !== null)
+          .sort((a, b) => b.score - a.score)
+          .map((e) => e.item)
+      : items;
 
-  items.push({
-    id: "nav_commands",
-    title: "Go to Commands",
-    category: "Navigation",
-    icon: <Code2 size={18} />,
-    action: () => {
-      navigate("/commands");
-      setIsOpen(false);
-    },
-  });
+    const byCategory = new Map<PaletteCategory, CommandPaletteItem[]>();
+    for (const category of CATEGORY_ORDER) byCategory.set(category, []);
+    for (const item of matched) byCategory.get(item.category)?.push(item);
 
-  items.push({
-    id: "nav_git",
-    title: "Go to Git",
-    category: "Navigation",
-    icon: <GitBranch size={18} />,
-    action: () => {
-      navigate("/git");
-      setIsOpen(false);
-    },
-  });
+    const ordered: Array<[PaletteCategory, CommandPaletteItem[]]> = CATEGORY_ORDER.map(
+      (category) => [category, byCategory.get(category) ?? []],
+    ).filter(([, list]) => list.length > 0) as Array<[PaletteCategory, CommandPaletteItem[]]>;
 
-  items.push({
-    id: "nav_docker",
-    title: "Go to Docker",
-    category: "Navigation",
-    icon: <Container size={18} />,
-    action: () => {
-      navigate("/docker");
-      setIsOpen(false);
-    },
-  });
+    return { grouped: ordered, flatItems: ordered.flatMap(([, list]) => list) };
+  }, [items, searchQuery]);
 
-  items.push({
-    id: "nav_settings",
-    title: "Go to Settings",
-    category: "Navigation",
-    icon: <Settings size={18} />,
-    action: () => {
-      navigate("/settings");
-      setIsOpen(false);
-    },
-  });
+  // Keep the highlighted row in range when the result set shrinks.
+  useEffect(() => {
+    if (selectedIndex >= flatItems.length) setSelectedIndex(0);
+  }, [flatItems.length, selectedIndex]);
 
-  // Filter items by search query
-  const filteredItems = items.filter(
-    (item) =>
-      item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (item.subtitle && item.subtitle.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      item.category.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Keep the highlighted row scrolled into view during keyboard navigation.
+  useEffect(() => {
+    listRef.current
+      ?.querySelector<HTMLElement>(`[data-index="${selectedIndex}"]`)
+      ?.scrollIntoView({ block: "nearest" });
+  }, [selectedIndex]);
 
-  // Keyboard navigation within the palette
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      setSelectedIndex((prev) => (prev < filteredItems.length - 1 ? prev + 1 : 0));
+      setSelectedIndex((prev) => (prev < flatItems.length - 1 ? prev + 1 : 0));
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
-      setSelectedIndex((prev) => (prev > 0 ? prev - 1 : filteredItems.length - 1));
+      setSelectedIndex((prev) => (prev > 0 ? prev - 1 : flatItems.length - 1));
     } else if (e.key === "Enter") {
       e.preventDefault();
-      if (filteredItems[selectedIndex]) {
-        filteredItems[selectedIndex].action();
-      }
+      flatItems[selectedIndex]?.action();
     } else if (e.key === "Escape") {
-      setIsOpen(false);
+      e.preventDefault();
+      close();
     }
   };
 
-  if (!isOpen) return null;
+  if (!isOpen) {
+    // The confirmation dialog must survive the palette closing, since running
+    // a destructive command closes the palette first.
+    return confirmElement;
+  }
 
-  // Group items by category for rendering
-  const groupedCategories = ["Projects", "Quick Actions", "Navigation"] as const;
+  let renderIndex = -1;
 
   return (
-    <div
-      className="cmd-palette-backdrop"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) setIsOpen(false);
-      }}
-    >
-      <div className="cmd-palette-container" onKeyDown={handleKeyDown}>
-        <div className="cmd-palette-header">
-          <Search size={18} className="cmd-search-icon" />
-          <input
-            ref={inputRef}
-            type="text"
-            className="cmd-search-input"
-            placeholder="Type a project, action, or command..."
-            value={searchQuery}
-            onChange={(e) => {
-              setSearchQuery(e.target.value);
-              setSelectedIndex(0);
-            }}
-          />
-          <span className="cmd-kbd-badge">ESC</span>
-        </div>
-
-        <div className="cmd-palette-results custom-scroller">
-          {filteredItems.length === 0 ? (
-            <div style={{ padding: "var(--space-5)", textAlign: "center", color: "var(--text-tertiary)" }}>
-              No results found for "{searchQuery}"
-            </div>
-          ) : (
-            letItemIndexCounter(-1, (getNextIndex) =>
-              groupedCategories.map((category) => {
-                const categoryItems = filteredItems.filter((i) => i.category === category);
-                if (categoryItems.length === 0) return null;
-
-                return (
-                  <div key={category}>
-                    <div className="cmd-group-title">{category}</div>
-                    {categoryItems.map((item) => {
-                      const itemIdx = getNextIndex();
-                      const isActive = itemIdx === selectedIndex;
-
-                      return (
-                        <div
-                          key={item.id}
-                          className={`cmd-item ${isActive ? "active" : ""}`}
-                          onClick={() => item.action()}
-                          onMouseEnter={() => setSelectedIndex(itemIdx)}
-                        >
-                          <div className="cmd-item-main">
-                            <div className="cmd-item-icon">{item.icon}</div>
-                            <div className="cmd-item-text">
-                              <span className="cmd-item-title">{item.title}</span>
-                              {item.subtitle && (
-                                <span className="cmd-item-subtitle">{item.subtitle}</span>
-                              )}
-                            </div>
-                          </div>
-                          <span className="cmd-item-action-badge">
-                            {item.category === "Projects" ? "Open Code" : "Select"}
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                );
-              })
-            )
-          )}
-        </div>
-
-        <div className="cmd-palette-footer">
-          <div className="cmd-footer-tips">
-            <span className="cmd-footer-tip">
-              <span className="cmd-kbd-badge">↑↓</span> navigate
-            </span>
-            <span className="cmd-footer-tip">
-              <span className="cmd-kbd-badge"><CornerDownLeft size={10} /></span> select
-            </span>
-            <span className="cmd-footer-tip">
-              <span className="cmd-kbd-badge">esc</span> close
-            </span>
+    <>
+      <div
+        className="cmd-palette-backdrop"
+        onClick={(e) => {
+          if (e.target === e.currentTarget) close();
+        }}
+      >
+        <div className="cmd-palette-container" onKeyDown={handleKeyDown}>
+          <div className="cmd-palette-header">
+            <Search size={18} className="cmd-search-icon" />
+            <input
+              ref={inputRef}
+              type="text"
+              className="cmd-search-input"
+              placeholder="Search projects, commands, or actions..."
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setSelectedIndex(0);
+              }}
+            />
+            <span className="cmd-kbd-badge">ESC</span>
           </div>
-          <span>Dev Launcher Palette</span>
+
+          <div className="cmd-palette-results custom-scroller" ref={listRef}>
+            {flatItems.length === 0 ? (
+              <div className="cmd-palette-no-results">No results found for "{searchQuery}"</div>
+            ) : (
+              grouped.map(([category, categoryItems]) => (
+                <div key={category}>
+                  <div className="cmd-group-title">{category}</div>
+                  {categoryItems.map((item) => {
+                    renderIndex += 1;
+                    const itemIdx = renderIndex;
+
+                    return (
+                      <div
+                        key={item.id}
+                        data-index={itemIdx}
+                        className={`cmd-item ${itemIdx === selectedIndex ? "active" : ""}`}
+                        onClick={() => item.action()}
+                        onMouseEnter={() => setSelectedIndex(itemIdx)}
+                      >
+                        <div className="cmd-item-main">
+                          <div className="cmd-item-icon">{item.icon}</div>
+                          <div className="cmd-item-text">
+                            <span className="cmd-item-title">{item.title}</span>
+                            {item.subtitle && (
+                              <span className="cmd-item-subtitle">{item.subtitle}</span>
+                            )}
+                          </div>
+                        </div>
+                        <span className="cmd-item-action-badge">{item.badge ?? "Select"}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              ))
+            )}
+          </div>
+
+          <div className="cmd-palette-footer">
+            <div className="cmd-footer-tips">
+              <span className="cmd-footer-tip">
+                <span className="cmd-kbd-badge">↑↓</span> navigate
+              </span>
+              <span className="cmd-footer-tip">
+                <span className="cmd-kbd-badge">
+                  <CornerDownLeft size={10} />
+                </span>{" "}
+                select
+              </span>
+              <span className="cmd-footer-tip">
+                <span className="cmd-kbd-badge">esc</span> close
+              </span>
+            </div>
+            <span>Dev Launcher Palette</span>
+          </div>
         </div>
       </div>
-    </div>
+
+      {confirmElement}
+    </>
   );
 };
-
-// Helper function to calculate linear indexes across grouped categories
-function letItemIndexCounter(
-  startIndex: number,
-  render: (getNextIndex: () => number) => React.ReactNode
-) {
-  let counter = startIndex;
-  return render(() => {
-    counter += 1;
-    return counter;
-  });
-}
 
 export default CommandPalette;

@@ -1,0 +1,74 @@
+.commands-page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow-y: auto;
+}
+
+.commands-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  margin-top: var(--space-4);
+}
+
+.commands-count {
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  color: var(--text-tertiary);
+}
+
+.commands-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.commands-filter-select {
+  background-color: var(--card-surface);
+  border: 1px solid var(--bg-tirtiary);
+  border-radius: 8px;
+  padding: 10px 12px;
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: var(--text-base);
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.2s ease;
+}
+
+.commands-filter-select:focus {
+  border-color: var(--text-secondary);
+}
+
+.commands-fav-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background-color: var(--card-surface);
+  border: 1px solid var(--bg-tirtiary);
+  border-radius: 8px;
+  padding: 10px 14px;
+  color: var(--text-secondary);
+  font-family: var(--font-ui);
+  font-size: var(--text-base);
+  font-weight: var(--font-medium);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.commands-fav-filter:hover:not(:disabled) {
+  border-color: var(--text-secondary);
+  color: var(--text-primary);
+}
+
+.commands-fav-filter.is-active {
+  border-color: #eab308;
+  color: var(--text-primary);
+}
+
+.commands-fav-filter:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}

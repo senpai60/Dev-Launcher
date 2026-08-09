@@ -1,41 +1,59 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
-  Search,
+  AlertTriangle,
   Code2,
-  Terminal,
-  Folder,
-  Play,
-  GitBranch,
   Copy,
-  Edit,
-  Trash2,
-  FolderOpen,
-  Zap,
-  Info,
   Cpu,
+  Edit,
+  Folder,
+  FolderOpen,
+  Info,
+  Play,
   Plus,
+  Search,
+  Star,
+  Terminal,
+  Trash2,
+  Zap,
 } from "lucide-react";
 import PageNavbar from "../../components/layout/navbar/PageNavbar";
-import {
-  ProjectCard,
-  ProjectCardData,
-} from "../../components/ui/ProjectCard/ProjectCard";
+import { ProjectCard, ProjectCardData } from "../../components/ui/ProjectCard/ProjectCard";
 import { ContextMenuItem } from "../../components/ui/ContextMenu/ContextMenu";
 import EmptyState from "../../components/ui/EmptyState/EmptyState";
 import Dialog from "../../components/ui/Dialog/Dialog";
 import Drawer from "../../components/ui/Drawer/Drawer";
+import ConfirmDialog from "../../components/ui/ConfirmDialog/ConfirmDialog";
+import CommandRow from "../../components/ui/Command/CommandRow";
+import CommandFormDialog from "../../components/ui/Command/CommandFormDialog";
 import Input from "../../components/ui/Form/Input";
 import Checkbox from "../../components/ui/Form/Checkbox";
 import TagInput from "../../components/ui/Form/TagInput";
 import FolderPicker from "../../components/ui/Form/FolderPicker";
+import { useToast } from "../../components/ui/Toast/ToastContext";
 import { useProjectContext } from "../../context/ProjectContext";
 import { useGroupContext } from "../../context/GroupContext";
 import { useProjectAPI } from "../../api/api";
-import { Project, ProjectCommand } from "../../../types/project";
-import { DetectedProjectMeta } from "../../../types/global";
+import { useCommandRunner } from "../../hooks/useCommandRunner";
+import { fuzzyFilter } from "../../utils/fuzzy";
+import type {
+  DetectedProjectMeta,
+  Project,
+  ProjectCommand,
+  ProjectWithStatus,
+} from "../../../types/project";
 import vscodeIcon from "../../app-icons/vscode.svg";
 import "./projects.css";
+
+const EMPTY_FORM = {
+  name: "",
+  path: "",
+  description: "",
+  tags: [] as string[],
+  groupId: "",
+  isFavorite: false,
+  commands: [] as ProjectCommand[],
+};
 
 const ProjectsPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -44,44 +62,40 @@ const ProjectsPage: React.FC = () => {
   const actionParam = searchParams.get("action") || "";
 
   const [searchQuery, setSearchQuery] = useState("");
-  const [isCreateOpen, setIsCreateOpen] = useState(false);
 
-  // Drawer & Commands State
-  const [selectedDrawerProject, setSelectedDrawerProject] = useState<Project | null>(null);
-  const [drawerMeta, setDrawerMeta] = useState<DetectedProjectMeta | null>(null);
-  const [isAddCommandOpen, setIsAddCommandOpen] = useState(false);
-  const [cmdName, setCmdName] = useState("");
-  const [cmdString, setCmdString] = useState("");
-  const [cmdDesc, setCmdDesc] = useState("");
-
-  // Form State
-  const [formName, setFormName] = useState("");
-  const [formPath, setFormPath] = useState("");
-  const [formDescription, setFormDescription] = useState("");
-  const [formTags, setFormTags] = useState<string[]>(["React", "Node.js"]);
-  const [formGroupId, setFormGroupId] = useState("");
-  const [formIsFavorite, setFormIsFavorite] = useState(false);
-  const [formCommands, setFormCommands] = useState<ProjectCommand[]>([]);
+  // Create / edit project dialog
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
+  const [form, setForm] = useState(EMPTY_FORM);
   const [formError, setFormError] = useState("");
   const [detectedMeta, setDetectedMeta] = useState<DetectedProjectMeta | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
+  // Drawer
+  const [drawerProjectId, setDrawerProjectId] = useState<string | null>(null);
+  const [drawerMeta, setDrawerMeta] = useState<DetectedProjectMeta | null>(null);
+
+  // Command dialogs
+  const [commandDialog, setCommandDialog] = useState<{
+    open: boolean;
+    editing: ProjectCommand | null;
+  }>({ open: false, editing: null });
+  const [commandToDelete, setCommandToDelete] = useState<ProjectCommand | null>(null);
+  const [projectToDelete, setProjectToDelete] = useState<ProjectWithStatus | null>(null);
+
+  const toast = useToast();
   const projectContext = useProjectContext();
-  const allProjects = projectContext?.allProjects;
-  const loadAllProjects = projectContext?.loadAllProjects;
-  const createProject = projectContext?.createProject;
-  const deleteProjectItem = projectContext?.deleteProjectItem;
-  const editProject = projectContext?.editProject;
-  const openProject = projectContext?.openProject;
-
   const groupCtx = useGroupContext();
-  const groups = groupCtx?.groups;
-  const loadGroups = groupCtx?.loadGroups;
-
   const projectApi = useProjectAPI();
+  const { requestRun, runningCommandId, confirmElement } = useCommandRunner();
+
+  const allProjects = projectContext?.allProjects;
+  const groups = groupCtx?.groups;
 
   useEffect(() => {
-    loadAllProjects?.();
-    loadGroups?.();
+    projectContext?.loadAllProjects();
+    groupCtx?.loadGroups?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -90,240 +104,285 @@ const ProjectsPage: React.FC = () => {
       searchParams.delete("action");
       setSearchParams(searchParams, { replace: true });
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [actionParam]);
 
-  // Filter & sort projects according to Phase 2 specs
-  let sourceProjects = (allProjects || []).slice();
+  // The drawer reads live from context so command edits appear immediately.
+  const drawerProject = useMemo(
+    () => (allProjects ?? []).find((p) => p.id === drawerProjectId) ?? null,
+    [allProjects, drawerProjectId],
+  );
 
-  if (filterParam === "favorites") {
-    sourceProjects = sourceProjects.filter((p) => p.isFavorite);
-  } else if (filterParam === "recent") {
-    sourceProjects = sourceProjects.sort(
-      (a, b) => (b.lastOpenedAt || b.updatedAt) - (a.lastOpenedAt || a.updatedAt)
-    );
-  } else if (groupParam) {
-    sourceProjects = sourceProjects.filter((p) => p.groupId === groupParam);
-  } else {
-    sourceProjects = sourceProjects.sort((a, b) => {
-      if (a.isFavorite && !b.isFavorite) return -1;
-      if (!a.isFavorite && b.isFavorite) return 1;
-      return (b.lastOpenedAt || b.updatedAt) - (a.lastOpenedAt || a.updatedAt);
-    });
-  }
+  /* -------------------------------------------------------------------- */
+  /*  Filtering                                                            */
+  /* -------------------------------------------------------------------- */
 
-  const projects: ProjectCardData[] = sourceProjects.map((p) => ({
+  const visibleProjects = useMemo(() => {
+    let source = (allProjects ?? []).slice();
+
+    if (filterParam === "favorites") {
+      source = source.filter((p) => p.isFavorite);
+    } else if (groupParam) {
+      source = source.filter((p) => p.groupId === groupParam);
+    }
+
+    if (filterParam === "recent") {
+      source.sort((a, b) => (b.lastOpenedAt || b.updatedAt) - (a.lastOpenedAt || a.updatedAt));
+    } else {
+      source.sort((a, b) => {
+        if (a.isFavorite !== b.isFavorite) return a.isFavorite ? -1 : 1;
+        return (b.lastOpenedAt || b.updatedAt) - (a.lastOpenedAt || a.updatedAt);
+      });
+    }
+
+    return fuzzyFilter(source, searchQuery, (p) => [
+      p.name,
+      p.tags?.join(" "),
+      p.description,
+      p.path,
+    ]);
+  }, [allProjects, filterParam, groupParam, searchQuery]);
+
+  const cards: ProjectCardData[] = visibleProjects.map((p) => ({
     id: p.id,
     name: p.name,
-    tech: p.tags && p.tags.length > 0 ? p.tags.join(" · ") : p.description || "No tech stack",
+    tags: p.tags ?? [],
+    fallbackTech: p.description || "No tech stack",
     path: p.path,
     isFavorite: p.isFavorite ?? false,
+    pathExists: p.pathExists,
+    commandCount: p.commands?.length ?? 0,
   }));
 
+  /* -------------------------------------------------------------------- */
+  /*  Project create / edit                                                */
+  /* -------------------------------------------------------------------- */
+
   const openCreateDialog = () => {
-    setFormName("");
-    setFormPath("");
-    setFormDescription("");
-    setFormTags(["React", "Express", "Node.js"]);
-    setFormGroupId(groupParam || "");
-    setFormIsFavorite(false);
-    setFormCommands([]);
+    setEditingProjectId(null);
+    setForm({ ...EMPTY_FORM, groupId: groupParam || "" });
     setFormError("");
     setDetectedMeta(null);
-    setIsCreateOpen(true);
+    setIsFormOpen(true);
   };
 
-  const handleOpenDrawer = async (cardData: ProjectCardData) => {
-    const fullProj = (allProjects || []).find((p) => p.id === cardData.id);
-    if (!fullProj) return;
-
-    setSelectedDrawerProject(fullProj);
-    setDrawerMeta(null);
-
-    try {
-      const meta = await projectApi.detectProject(fullProj.path);
-      setDrawerMeta(meta);
-    } catch (e) {
-      console.error("Error auto-detecting meta for drawer:", e);
-    }
+  const openEditDialog = (project: ProjectWithStatus) => {
+    setEditingProjectId(project.id);
+    setForm({
+      name: project.name,
+      path: project.path,
+      description: project.description ?? "",
+      tags: project.tags ?? [],
+      groupId: project.groupId ?? "",
+      isFavorite: project.isFavorite ?? false,
+      commands: project.commands ?? [],
+    });
+    setFormError("");
+    setDetectedMeta(null);
+    setIsFormOpen(true);
   };
 
   const handleFolderChange = async (selectedPath: string, extractedName?: string) => {
-    setFormPath(selectedPath);
-    if (selectedPath) {
-      setFormError("");
-      try {
-        const meta = await projectApi.detectProject(selectedPath);
-        if (meta) {
-          setDetectedMeta(meta);
-          if (meta.name) setFormName(meta.name);
-          if (meta.tags && meta.tags.length > 0) setFormTags(meta.tags);
-          if (meta.description) setFormDescription(meta.description);
-          if (meta.commands && meta.commands.length > 0) setFormCommands(meta.commands);
-        }
-      } catch (err) {
-        if (extractedName) setFormName(extractedName);
-      }
-    } else {
+    setForm((f) => ({ ...f, path: selectedPath }));
+    setFormError("");
+
+    if (!selectedPath) {
       setDetectedMeta(null);
+      return;
+    }
+
+    try {
+      const meta = await projectApi.detectProject(selectedPath);
+      setDetectedMeta(meta);
+      setForm((f) => ({
+        ...f,
+        // Don't overwrite fields the user already filled in.
+        name: f.name || meta.name || extractedName || "",
+        tags: f.tags.length > 0 ? f.tags : meta.tags,
+        description: f.description || meta.description || "",
+        commands: f.commands.length > 0 ? f.commands : meta.commands,
+      }));
+    } catch {
+      setForm((f) => ({ ...f, name: f.name || extractedName || "" }));
     }
   };
 
-  const handleFormSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formPath.trim()) {
+  const handleFormSubmit = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    if (isSaving) return;
+
+    if (!form.path.trim()) {
       setFormError("Project location is required.");
       return;
     }
-    if (!formName.trim()) {
+    if (!form.name.trim()) {
       setFormError("Project name is required.");
       return;
     }
 
-    const newProjectData: Partial<Project> = {
-      name: formName.trim(),
-      path: formPath.trim(),
-      description: formDescription.trim(),
-      tags: formTags,
-      commands: formCommands,
-      groupId: formGroupId || undefined,
-      isFavorite: formIsFavorite,
+    const payload: Partial<Project> = {
+      name: form.name.trim(),
+      path: form.path.trim(),
+      description: form.description.trim() || undefined,
+      tags: form.tags,
+      groupId: form.groupId || undefined,
+      isFavorite: form.isFavorite,
     };
 
-    if (createProject) {
-      await createProject(newProjectData);
+    setIsSaving(true);
+    const result = editingProjectId
+      ? await projectContext?.editProject(editingProjectId, payload)
+      : await projectContext?.createProject({ ...payload, commands: form.commands });
+    setIsSaving(false);
+
+    if (result) {
+      if (editingProjectId) toast.success(`Updated ${result.name}`);
+      setIsFormOpen(false);
     }
-    setIsCreateOpen(false);
   };
 
-  const handleRunCustomCommand = async (cmd: ProjectCommand) => {
-    if (!selectedDrawerProject) return;
+  /* -------------------------------------------------------------------- */
+  /*  Drawer                                                               */
+  /* -------------------------------------------------------------------- */
+
+  const handleOpenDrawer = async (cardData: ProjectCardData) => {
+    const project = (allProjects ?? []).find((p) => p.id === cardData.id);
+    if (!project) return;
+
+    setDrawerProjectId(project.id);
+    setDrawerMeta(null);
+
+    if (!project.pathExists) return;
+
     try {
-      await projectApi.runCustomCommand(cmd.command, selectedDrawerProject.path);
-    } catch (err) {
-      console.error("Failed to execute command:", err);
+      const meta = await projectApi.detectProject(project.path);
+      setDrawerMeta(meta);
+
+      // Promote detected commands into real, editable records the first time
+      // this project is opened, so they can be edited and deleted like any
+      // other command rather than being regenerated on each detection.
+      if ((project.commands?.length ?? 0) === 0 && meta.commands.length > 0) {
+        await projectContext?.seedCommands(project.id, meta.commands);
+      }
+    } catch (e) {
+      console.warn("Detection failed for drawer:", e);
     }
   };
 
-  const handleAddCommandSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedDrawerProject || !cmdName.trim() || !cmdString.trim()) return;
+  // Favourites first, then alphabetical.
+  const sortedCommands = useMemo(
+    () =>
+      [...(drawerProject?.commands ?? [])].sort((a, b) => {
+        if (a.isFavorite !== b.isFavorite) return a.isFavorite ? -1 : 1;
+        return a.name.localeCompare(b.name);
+      }),
+    [drawerProject],
+  );
 
-    const newCmd: ProjectCommand = {
-      id: `cmd_${Date.now()}`,
-      name: cmdName.trim(),
-      command: cmdString.trim(),
-      description: cmdDesc.trim(),
-      isFavorite: false,
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-    };
+  const handleCommandSubmit = async (values: Partial<ProjectCommand>) => {
+    if (!drawerProject) return false;
 
-    const existingCmds = selectedDrawerProject.commands || drawerMeta?.commands || [];
-    const updatedCmds = [...existingCmds, newCmd];
-
-    if (editProject) {
-      await editProject(selectedDrawerProject.id, { commands: updatedCmds });
-      setSelectedDrawerProject({ ...selectedDrawerProject, commands: updatedCmds });
+    if (commandDialog.editing) {
+      return (
+        (await projectContext?.updateCommand(
+          drawerProject.id,
+          commandDialog.editing.id,
+          values,
+        )) ?? false
+      );
     }
+    return (await projectContext?.addCommand(drawerProject.id, values)) ?? false;
+  };
 
-    setCmdName("");
-    setCmdString("");
-    setCmdDesc("");
-    setIsAddCommandOpen(false);
+  /* -------------------------------------------------------------------- */
+  /*  Card menu                                                            */
+  /* -------------------------------------------------------------------- */
+
+  const getMenuItems = (card: ProjectCardData): ContextMenuItem[] => {
+    const project = (allProjects ?? []).find((p) => p.id === card.id);
+
+    return [
+      {
+        id: "details",
+        label: "View details & commands",
+        icon: <Info size={14} />,
+        onClick: () => handleOpenDrawer(card),
+      },
+      { id: "div0", isDivider: true },
+      {
+        id: "vscode",
+        label: "Open in VS Code",
+        icon: <Code2 size={14} />,
+        onClick: () => projectContext?.openProject(card.id, "vscode"),
+      },
+      {
+        id: "terminal",
+        label: "Open terminal",
+        icon: <Terminal size={14} />,
+        onClick: () => projectContext?.openProject(card.id, "terminal"),
+      },
+      {
+        id: "folder",
+        label: "Open folder",
+        icon: <Folder size={14} />,
+        onClick: () => projectContext?.openProject(card.id, "folder"),
+      },
+      { id: "div1", isDivider: true },
+      {
+        id: "favorite",
+        label: card.isFavorite ? "Remove from favorites" : "Add to favorites",
+        icon: <Star size={14} />,
+        onClick: () => toggleFavorite(card.id),
+      },
+      {
+        id: "copy",
+        label: "Copy path",
+        icon: <Copy size={14} />,
+        onClick: () => copyPath(card.path),
+      },
+      {
+        id: "edit",
+        label: "Edit project",
+        icon: <Edit size={14} />,
+        onClick: () => project && openEditDialog(project),
+      },
+      { id: "div2", isDivider: true },
+      {
+        id: "delete",
+        label: "Remove from launcher",
+        icon: <Trash2 size={14} />,
+        isDanger: true,
+        onClick: () => project && setProjectToDelete(project),
+      },
+    ];
   };
 
   const toggleFavorite = async (id: string) => {
-    const p = projects.find((item) => item.id === id);
-    if (p && editProject) {
-      await editProject(id, { isFavorite: !p.isFavorite });
+    const project = (allProjects ?? []).find((p) => p.id === id);
+    if (project) {
+      await projectContext?.editProject(id, { isFavorite: !project.isFavorite });
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (deleteProjectItem) {
-      await deleteProjectItem(id);
+  const copyPath = async (path: string) => {
+    try {
+      await navigator.clipboard.writeText(path);
+      toast.success("Path copied");
+    } catch {
+      toast.error("Could not copy path");
     }
   };
 
-  const filteredProjects = projects.filter(
-    (p) =>
-      p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.tech.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.path.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  const getDynamicMenuItems = (project: ProjectCardData): ContextMenuItem[] => [
-    {
-      id: "details",
-      label: "View Project Details & Commands",
-      icon: <Info size={14} />,
-      onClick: () => handleOpenDrawer(project),
-    },
-    { id: "div0", isDivider: true },
-    {
-      id: "vscode",
-      label: "Open in VS Code",
-      icon: <Code2 size={14} />,
-      onClick: () => openProject?.(project.id, "vscode"),
-    },
-    {
-      id: "terminal",
-      label: "Open Terminal",
-      icon: <Terminal size={14} />,
-      onClick: () => openProject?.(project.id, "terminal"),
-    },
-    {
-      id: "folder",
-      label: "Open Folder",
-      icon: <Folder size={14} />,
-      onClick: () => openProject?.(project.id, "folder"),
-    },
-    {
-      id: "run",
-      label: "Run Command",
-      icon: <Play size={14} />,
-      onClick: () => openProject?.(project.id, "terminal"),
-    },
-    {
-      id: "git",
-      label: "Git",
-      icon: <GitBranch size={14} />,
-      onClick: () => openProject?.(project.id, "terminal"),
-    },
-    { id: "div1", isDivider: true },
-    {
-      id: "copy",
-      label: "Copy Path",
-      icon: <Copy size={14} />,
-      onClick: () => navigator.clipboard.writeText(project.path),
-    },
-    {
-      id: "edit",
-      label: "Edit",
-      icon: <Edit size={14} />,
-      onClick: () => console.log("Editing project:", project.name),
-    },
-    {
-      id: "delete",
-      label: "Delete",
-      icon: <Trash2 size={14} />,
-      isDanger: true,
-      onClick: () => handleDelete(project.id),
-    },
-  ];
-
-  const activeGroup = (groups || []).find((g) => g.id === groupParam);
+  const activeGroup = (groups ?? []).find((g) => g.id === groupParam);
 
   const getPageTitle = () => {
     if (filterParam === "favorites") return "Projects / Favorites";
     if (filterParam === "recent") return "Projects / Recent";
     if (activeGroup) return `Projects / ${activeGroup.name}`;
-    if (groupParam) return `Projects / ${groupParam.replace("group_", "").toUpperCase()}`;
     return "Projects / All Projects";
   };
 
-  const assignedGroup = (groups || []).find((g) => g.id === selectedDrawerProject?.groupId);
-  const activeCommands = selectedDrawerProject?.commands || drawerMeta?.commands || [];
+  const assignedGroup = (groups ?? []).find((g) => g.id === drawerProject?.groupId);
 
   return (
     <section className="projects-page">
@@ -338,7 +397,6 @@ const ProjectsPage: React.FC = () => {
       </PageNavbar>
 
       <div className="projects-content">
-        {/* Search Bar */}
         <div className="search-container">
           <Search size={16} className="search-icon" />
           <input
@@ -350,200 +408,209 @@ const ProjectsPage: React.FC = () => {
           />
         </div>
 
-        {/* Real Projects Grid OR Centered Empty State */}
-        {filteredProjects.length === 0 ? (
+        {cards.length === 0 ? (
           <EmptyState
             icon={<FolderOpen size={32} strokeWidth={1.5} />}
             title={
-              activeGroup
-                ? `No projects in ${activeGroup.name}`
-                : filterParam === "favorites"
-                ? "No favorite projects"
-                : "No projects yet"
+              searchQuery
+                ? `No projects match "${searchQuery}"`
+                : activeGroup
+                  ? `No projects in ${activeGroup.name}`
+                  : filterParam === "favorites"
+                    ? "No favorite projects"
+                    : "No projects yet"
             }
             description={
-              filterParam === "favorites"
-                ? "Star projects to add them to your favorites list."
-                : "Add your first project to start managing your workspace."
+              searchQuery
+                ? "Try a different search term."
+                : filterParam === "favorites"
+                  ? "Star projects to add them to your favorites list."
+                  : "Add your first project to start managing your workspace."
             }
-            actionLabel={activeGroup ? `Add Project to ${activeGroup.name}` : "Add Project"}
-            onAction={openCreateDialog}
+            actionLabel={searchQuery ? undefined : "Add Project"}
+            onAction={searchQuery ? undefined : openCreateDialog}
           />
         ) : (
           <div className="projects-grid">
-            {filteredProjects.map((project) => (
+            {cards.map((card) => (
               <ProjectCard
-                key={project.id}
-                project={project}
+                key={card.id}
+                project={card}
                 onClickCard={handleOpenDrawer}
                 onToggleFavorite={toggleFavorite}
-                onOpenFolder={(p) => openProject?.(p.id, "folder")}
-                onOpenVSCode={(p) => openProject?.(p.id, "vscode")}
-                onOpenTerminal={(p) => openProject?.(p.id, "terminal")}
-                menuItems={getDynamicMenuItems(project)}
+                onOpenFolder={(p) => projectContext?.openProject(p.id, "folder")}
+                onOpenVSCode={(p) => projectContext?.openProject(p.id, "vscode")}
+                onOpenTerminal={(p) => projectContext?.openProject(p.id, "terminal")}
+                onLocate={(p) => {
+                  const project = (allProjects ?? []).find((item) => item.id === p.id);
+                  if (project) openEditDialog(project);
+                }}
+                menuItems={getMenuItems(card)}
               />
             ))}
           </div>
         )}
       </div>
 
-      {/* SHARED DRAWER — PHASE 4 & PHASE 5 CUSTOM COMMANDS */}
+      {/* ---- Project detail drawer ------------------------------------ */}
       <Drawer
-        isOpen={Boolean(selectedDrawerProject)}
-        onClose={() => setSelectedDrawerProject(null)}
-        title={selectedDrawerProject?.name}
-        subtitle={selectedDrawerProject?.path}
+        isOpen={Boolean(drawerProject)}
+        onClose={() => setDrawerProjectId(null)}
+        title={drawerProject?.name}
+        subtitle={drawerProject?.path}
         width="480px"
       >
-        {selectedDrawerProject && (
+        {drawerProject && (
           <>
-            {/* Quick Actions Bar */}
-            <div style={{ display: "flex", gap: "var(--space-2)" }}>
+            {!drawerProject.pathExists && (
+              <div className="drawer-alert">
+                <AlertTriangle size={15} />
+                <div>
+                  <strong>This folder no longer exists.</strong>
+                  <span>Update the location to use this project again.</span>
+                  <button className="drawer-alert-action" onClick={() => openEditDialog(drawerProject)}>
+                    Update location
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <div className="drawer-quick-actions">
               <button
-                className="action-btn text-button"
-                style={{ flex: 1, padding: "8px", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6 }}
-                onClick={() => openProject?.(selectedDrawerProject.id, "vscode")}
+                className="action-btn text-button drawer-quick-btn"
+                onClick={() => projectContext?.openProject(drawerProject.id, "vscode")}
+                disabled={!drawerProject.pathExists}
               >
-                <img src={vscodeIcon} alt="VS Code" style={{ width: 14, height: 14 }} />
+                <img src={vscodeIcon} alt="" style={{ width: 14, height: 14 }} />
                 <span>VS Code</span>
               </button>
               <button
-                className="action-btn text-button"
-                style={{ flex: 1, padding: "8px", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6 }}
-                onClick={() => openProject?.(selectedDrawerProject.id, "terminal")}
+                className="action-btn text-button drawer-quick-btn"
+                onClick={() => projectContext?.openProject(drawerProject.id, "terminal")}
+                disabled={!drawerProject.pathExists}
               >
                 <Terminal size={14} />
                 <span>Terminal</span>
               </button>
               <button
-                className="action-btn text-button"
-                style={{ flex: 1, padding: "8px", display: "inline-flex", alignItems: "center", gap: 6, justifyContent: "center" }}
-                onClick={() => openProject?.(selectedDrawerProject.id, "folder")}
+                className="action-btn text-button drawer-quick-btn"
+                onClick={() => projectContext?.openProject(drawerProject.id, "folder")}
+                disabled={!drawerProject.pathExists}
               >
                 <Folder size={14} />
                 <span>Folder</span>
               </button>
             </div>
 
-            {/* PHASE 5: CUSTOM PROJECT COMMANDS */}
+            {/* ---- Commands ------------------------------------------- */}
             <div className="drawer-section">
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <div className="drawer-section-header">
                 <span className="drawer-section-title">
                   <Play size={14} style={{ color: "#10b981" }} />
-                  <span>Phase 5 Custom Commands</span>
+                  <span>Commands</span>
                 </span>
                 <button
                   type="button"
-                  className="action-btn text-button"
-                  style={{ padding: "2px 6px", fontSize: "var(--text-xs)", display: "inline-flex", alignItems: "center", gap: 4 }}
-                  onClick={() => setIsAddCommandOpen(true)}
+                  className="drawer-section-action"
+                  onClick={() => setCommandDialog({ open: true, editing: null })}
                 >
                   <Plus size={12} />
                   <span>Add Command</span>
                 </button>
               </div>
 
-              {activeCommands.length > 0 ? (
-                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  {activeCommands.map((cmd) => (
-                    <div
+              {sortedCommands.length > 0 ? (
+                <div className="command-list">
+                  {sortedCommands.map((cmd) => (
+                    <CommandRow
                       key={cmd.id}
-                      style={{
-                        backgroundColor: "var(--card-surface)",
-                        border: "1px solid var(--bg-tirtiary)",
-                        borderRadius: "8px",
-                        padding: "8px 12px",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                      }}
-                    >
-                      <div style={{ display: "flex", flexDirection: "column", gap: 2, overflow: "hidden" }}>
-                        <span style={{ fontSize: "var(--text-sm)", fontWeight: "var(--font-medium)" as any, color: "var(--text-primary)" }}>
-                          {cmd.name}
-                        </span>
-                        <span style={{ fontFamily: "var(--font-mono)", fontSize: "var(--text-xs)", color: "var(--text-tertiary)" }}>
-                          {cmd.command}
-                        </span>
-                      </div>
-
-                      <button
-                        className="app-launch-btn text-button"
-                        style={{ padding: "4px 10px", fontSize: "var(--text-xs)" }}
-                        onClick={() => handleRunCustomCommand(cmd)}
-                      >
-                        <Play size={12} />
-                        <span>Run</span>
-                      </button>
-                    </div>
+                      command={cmd}
+                      isRunning={runningCommandId === cmd.id}
+                      disabled={!drawerProject.pathExists}
+                      disabledReason="The project folder is missing."
+                      onRun={(c) => requestRun(drawerProject, c)}
+                      onEdit={(c) => setCommandDialog({ open: true, editing: c })}
+                      onDelete={(c) => setCommandToDelete(c)}
+                      onToggleFavorite={(c) =>
+                        projectContext?.updateCommand(drawerProject.id, c.id, {
+                          isFavorite: !c.isFavorite,
+                        })
+                      }
+                    />
                   ))}
                 </div>
               ) : (
-                <p className="text-meta" style={{ fontSize: "var(--text-xs)", fontStyle: "italic" }}>
-                  No custom commands defined yet. Click + Add Command.
+                <p className="command-list-empty">
+                  No commands yet. Add one to stop typing it by hand.
                 </p>
               )}
             </div>
 
-            {/* Section 1: Auto-Detected Tech Stack & Tags */}
+            {/* ---- Tech stack ----------------------------------------- */}
             <div className="drawer-section">
               <span className="drawer-section-title">
                 <Zap size={14} style={{ color: "#f59e0b" }} />
-                <span>Phase 4 Auto-Detected Tech Stack</span>
+                <span>Tech Stack</span>
               </span>
               <div className="drawer-tags-list">
-                {(drawerMeta?.tags || selectedDrawerProject.tags || ["JavaScript"]).map((tag) => (
-                  <span key={tag} className="drawer-tag-pill">
-                    {tag}
-                  </span>
-                ))}
+                {(drawerMeta?.tags?.length ? drawerMeta.tags : drawerProject.tags ?? []).map(
+                  (tag) => (
+                    <span key={tag} className="drawer-tag-pill">
+                      {tag}
+                    </span>
+                  ),
+                )}
+                {!drawerMeta?.tags?.length && !drawerProject.tags?.length && (
+                  <span className="command-list-empty">Nothing detected.</span>
+                )}
               </div>
             </div>
 
-            {/* Section 2: Detailed System Breakdown */}
+            {/* ---- Toolchain ------------------------------------------ */}
             <div className="drawer-section">
               <span className="drawer-section-title">
                 <Cpu size={14} />
-                <span>Detected Toolchain & Environment</span>
+                <span>Detected Toolchain</span>
               </span>
               <div className="drawer-meta-grid">
                 <div className="drawer-meta-item">
                   <span className="drawer-meta-label">Languages</span>
                   <span className="drawer-meta-val">
-                    {drawerMeta?.details.languages.join(", ") || "JavaScript"}
+                    {drawerMeta?.details.languages.join(", ") || "—"}
                   </span>
                 </div>
-
                 <div className="drawer-meta-item">
                   <span className="drawer-meta-label">Frameworks</span>
                   <span className="drawer-meta-val">
-                    {drawerMeta?.details.frameworks.join(", ") || "None"}
+                    {drawerMeta?.details.frameworks.join(", ") || "—"}
                   </span>
                 </div>
-
                 <div className="drawer-meta-item">
                   <span className="drawer-meta-label">Package Manager</span>
                   <span className="drawer-meta-val">
-                    {drawerMeta?.details.packageManager || "npm"}
+                    {drawerMeta?.details.packageManager || "—"}
                   </span>
                 </div>
-
                 <div className="drawer-meta-item">
-                  <span className="drawer-meta-label">Git Control</span>
-                  <span className="drawer-meta-val" style={{ color: drawerMeta?.details.hasGit ? "#10b981" : "var(--text-tertiary)" }}>
-                    {drawerMeta?.details.hasGit ? "● Active (.git)" : "Not initialized"}
+                  <span className="drawer-meta-label">Git</span>
+                  <span
+                    className="drawer-meta-val"
+                    style={{ color: drawerMeta?.details.hasGit ? "#10b981" : "var(--text-tertiary)" }}
+                  >
+                    {drawerMeta?.details.hasGit ? "● Repository" : "Not initialized"}
                   </span>
                 </div>
-
                 <div className="drawer-meta-item">
-                  <span className="drawer-meta-label">Docker Infra</span>
-                  <span className="drawer-meta-val" style={{ color: drawerMeta?.details.hasDocker ? "#10b981" : "var(--text-tertiary)" }}>
+                  <span className="drawer-meta-label">Docker</span>
+                  <span
+                    className="drawer-meta-val"
+                    style={{ color: drawerMeta?.details.hasDocker ? "#10b981" : "var(--text-tertiary)" }}
+                  >
                     {drawerMeta?.details.hasDocker ? "● Detected" : "Not detected"}
                   </span>
                 </div>
-
                 <div className="drawer-meta-item">
-                  <span className="drawer-meta-label">Collection Group</span>
+                  <span className="drawer-meta-label">Group</span>
                   <span className="drawer-meta-val">
                     {assignedGroup ? assignedGroup.name : "Unassigned"}
                   </span>
@@ -551,20 +618,18 @@ const ProjectsPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Section 3: File Location & Path */}
+            {/* ---- Location -------------------------------------------- */}
             <div className="drawer-section">
               <span className="drawer-section-title">
                 <FolderOpen size={14} />
-                <span>Filesystem Location</span>
+                <span>Location</span>
               </span>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-                <span className="drawer-subtitle" style={{ fontSize: "var(--text-xs)" }}>
-                  {selectedDrawerProject.path}
-                </span>
+              <div className="drawer-path-row">
+                <span className="drawer-path-text">{drawerProject.path}</span>
                 <button
-                  className="action-btn text-button"
-                  style={{ padding: "4px 8px", fontSize: "var(--text-xs)" }}
-                  onClick={() => navigator.clipboard.writeText(selectedDrawerProject.path)}
+                  className="action-btn text-button drawer-path-copy"
+                  onClick={() => copyPath(drawerProject.path)}
+                  title="Copy path"
                 >
                   <Copy size={13} />
                 </button>
@@ -574,74 +639,82 @@ const ProjectsPage: React.FC = () => {
         )}
       </Drawer>
 
-      {/* ADD CUSTOM COMMAND DIALOG */}
-      <Dialog
-        isOpen={isAddCommandOpen}
-        onClose={() => setIsAddCommandOpen(false)}
-        title="Add Custom Project Command"
-        footer={
+      {/* ---- Command add / edit --------------------------------------- */}
+      <CommandFormDialog
+        isOpen={commandDialog.open}
+        command={commandDialog.editing}
+        projectPath={drawerProject?.path}
+        onClose={() => setCommandDialog({ open: false, editing: null })}
+        onSubmit={handleCommandSubmit}
+      />
+
+      {/* ---- Destructive-command confirmation -------------------------- */}
+      {confirmElement}
+
+      {/* ---- Delete command confirmation ------------------------------- */}
+      <ConfirmDialog
+        isOpen={Boolean(commandToDelete)}
+        isDanger
+        title="Delete command?"
+        message={
           <>
-            <button
-              className="action-btn text-button"
-              style={{ padding: "8px 16px" }}
-              onClick={() => setIsAddCommandOpen(false)}
-            >
-              Cancel
-            </button>
-            <button
-              className="primary-action-btn text-button"
-              onClick={handleAddCommandSubmit}
-            >
-              Save Command
-            </button>
+            <strong>{commandToDelete?.name}</strong> will be removed from this project.
           </>
         }
-      >
-        <form onSubmit={handleAddCommandSubmit}>
-          <Input
-            label="Command Name"
-            placeholder="e.g. Start Dev Server, Build, Test"
-            value={cmdName}
-            onChange={(e) => setCmdName(e.target.value)}
-            required
-          />
+        detail={commandToDelete?.command}
+        confirmLabel="Delete"
+        onCancel={() => setCommandToDelete(null)}
+        onConfirm={() => {
+          if (drawerProject && commandToDelete) {
+            void projectContext?.deleteCommand(drawerProject.id, commandToDelete.id);
+          }
+          setCommandToDelete(null);
+        }}
+      />
 
-          <Input
-            label="Command String"
-            placeholder="e.g. npm run dev, python main.py"
-            value={cmdString}
-            onChange={(e) => setCmdString(e.target.value)}
-            required
-          />
+      {/* ---- Delete project confirmation ------------------------------- */}
+      <ConfirmDialog
+        isOpen={Boolean(projectToDelete)}
+        isDanger
+        title="Remove project?"
+        message={
+          <>
+            <strong>{projectToDelete?.name}</strong> will be removed from Dev Launcher. The folder
+            on disk is not deleted.
+          </>
+        }
+        detail={projectToDelete?.path}
+        confirmLabel="Remove"
+        onCancel={() => setProjectToDelete(null)}
+        onConfirm={() => {
+          if (projectToDelete) {
+            void projectContext?.deleteProjectItem(projectToDelete.id);
+            if (drawerProjectId === projectToDelete.id) setDrawerProjectId(null);
+          }
+          setProjectToDelete(null);
+        }}
+      />
 
-          <Input
-            label="Description (Optional)"
-            placeholder="e.g. Launch local Vite development server"
-            value={cmdDesc}
-            onChange={(e) => setCmdDesc(e.target.value)}
-          />
-        </form>
-      </Dialog>
-
-      {/* REUSABLE DIALOG & NEW PROJECT FORM WITH AUTO DETECTION */}
+      {/* ---- Create / edit project ------------------------------------- */}
       <Dialog
-        isOpen={isCreateOpen}
-        onClose={() => setIsCreateOpen(false)}
-        title="Create New Project"
+        isOpen={isFormOpen}
+        onClose={() => setIsFormOpen(false)}
+        title={editingProjectId ? "Edit Project" : "Create New Project"}
         footer={
           <>
             <button
               className="action-btn text-button"
               style={{ padding: "8px 16px" }}
-              onClick={() => setIsCreateOpen(false)}
+              onClick={() => setIsFormOpen(false)}
             >
               Cancel
             </button>
             <button
               className="primary-action-btn text-button"
-              onClick={handleFormSubmit}
+              onClick={() => handleFormSubmit()}
+              disabled={isSaving}
             >
-              Create Project
+              {isSaving ? "Saving..." : editingProjectId ? "Save Changes" : "Create Project"}
             </button>
           </>
         }
@@ -649,55 +722,44 @@ const ProjectsPage: React.FC = () => {
         <form onSubmit={handleFormSubmit}>
           <FolderPicker
             label="Project Location"
-            value={formPath}
+            value={form.path}
             onChange={handleFolderChange}
-            error={formError && !formPath ? formError : undefined}
+            error={formError && !form.path ? formError : undefined}
           />
 
-          {detectedMeta && (
-            <div
-              style={{
-                backgroundColor: "var(--button-inside)",
-                border: "1px solid var(--bg-tirtiary)",
-                borderRadius: "8px",
-                padding: "8px 12px",
-                marginBottom: "var(--space-4)",
-                display: "flex",
-                alignItems: "center",
-                gap: "8px",
-                fontSize: "var(--text-xs)",
-                color: "var(--text-primary)",
-              }}
-            >
+          {detectedMeta && detectedMeta.tags.length > 0 && (
+            <div className="detected-banner">
               <Zap size={14} style={{ color: "#f59e0b", flexShrink: 0 }} />
               <span>
-                Auto-detected: <strong>{detectedMeta.tags.join(" · ")}</strong>
+                Detected: <strong>{detectedMeta.tags.join(" · ")}</strong>
+                {detectedMeta.commands.length > 0 && (
+                  <> · {detectedMeta.commands.length} commands</>
+                )}
               </span>
             </div>
           )}
 
           <Input
             label="Project Name"
-            placeholder="Select a location or type name..."
-            value={formName}
+            placeholder="Select a location or type a name..."
+            value={form.name}
             onChange={(e) => {
-              setFormName(e.target.value);
+              setForm((f) => ({ ...f, name: e.target.value }));
               if (e.target.value) setFormError("");
             }}
-            error={formError && !formName ? formError : undefined}
+            error={formError && !form.name ? formError : undefined}
             required
           />
 
-          {/* Group / Collection Dropdown */}
           <div className="form-field">
             <label className="form-label">Collection / Group (Optional)</label>
             <select
               className="form-input"
-              value={formGroupId}
-              onChange={(e) => setFormGroupId(e.target.value)}
+              value={form.groupId}
+              onChange={(e) => setForm((f) => ({ ...f, groupId: e.target.value }))}
             >
               <option value="">No Group (Unassigned)</option>
-              {(groups || []).map((g) => (
+              {(groups ?? []).map((g) => (
                 <option key={g.id} value={g.id}>
                   {g.name}
                 </option>
@@ -707,22 +769,22 @@ const ProjectsPage: React.FC = () => {
 
           <TagInput
             label="Tech Stack / Tags"
-            tags={formTags}
-            onChange={setFormTags}
-            placeholder="Type tag (e.g. React, MongoDB) and press Enter..."
+            tags={form.tags}
+            onChange={(tags) => setForm((f) => ({ ...f, tags }))}
+            placeholder="Type a tag and press Enter..."
           />
 
           <Input
             label="Description (Optional)"
-            placeholder="e.g. Web application dashboard launcher"
-            value={formDescription}
-            onChange={(e) => setFormDescription(e.target.value)}
+            placeholder="e.g. Internal CRM dashboard"
+            value={form.description}
+            onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
           />
 
           <Checkbox
             label="Add to Favorites"
-            checked={formIsFavorite}
-            onChange={setFormIsFavorite}
+            checked={form.isFavorite}
+            onChange={(checked) => setForm((f) => ({ ...f, isFavorite: checked }))}
           />
         </form>
       </Dialog>

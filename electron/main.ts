@@ -1,11 +1,10 @@
-import { app, BrowserWindow } from "electron";
-import { createRequire } from "node:module";
+import { app, BrowserWindow, shell } from "electron";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { registerProjectIPC } from "./ipc/project.ipc";
 import { registerGroupIPC } from "./ipc/group.ipc";
+import { registerDialogIPC } from "./ipc/dialog.ipc";
 
-const require = createRequire(import.meta.url);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // The built directory structure
@@ -33,14 +32,39 @@ let win: BrowserWindow | null;
 function createWindow() {
   win = new BrowserWindow({
     icon: path.join(process.env.VITE_PUBLIC, "electron-vite.svg"),
+    width: 1280,
+    height: 820,
+    minWidth: 940,
+    minHeight: 600,
+    backgroundColor: "#181818",
     webPreferences: {
       preload: path.join(__dirname, "preload.mjs"),
+      // Set explicitly rather than relying on Electron's defaults, so a major
+      // version bump can never silently weaken the sandbox.
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+      webviewTag: false,
     },
   });
 
-  // Test active push message to Renderer-process.
-  win.webContents.on("did-finish-load", () => {
-    win?.webContents.send("main-process-message", new Date().toLocaleString());
+  // Nothing in this app should ever open a second window or navigate away from
+  // the bundled UI. External links go to the OS browser instead.
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    if (url.startsWith("http://") || url.startsWith("https://")) {
+      shell.openExternal(url);
+    }
+    return { action: "deny" };
+  });
+
+  win.webContents.on("will-navigate", (event, url) => {
+    const isDevServer = VITE_DEV_SERVER_URL && url.startsWith(VITE_DEV_SERVER_URL);
+    if (!isDevServer && !url.startsWith("file://")) {
+      event.preventDefault();
+      if (url.startsWith("http://") || url.startsWith("https://")) {
+        shell.openExternal(url);
+      }
+    }
   });
 
   if (VITE_DEV_SERVER_URL) {
@@ -63,7 +87,11 @@ app.on("activate", () => {
   }
 });
 
-app.whenReady().then(createWindow);
-
-registerProjectIPC();
-registerGroupIPC();
+// Handlers are registered before the window loads so the renderer can never
+// invoke a channel that does not exist yet.
+app.whenReady().then(() => {
+  registerProjectIPC();
+  registerGroupIPC();
+  registerDialogIPC();
+  createWindow();
+});

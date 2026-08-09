@@ -11,6 +11,33 @@ export type Project = {
   createdAt: number;
   updatedAt: number;
   lastOpenedAt?: number;
+  lastCommandAt?: number;
+};
+
+/**
+ * A project enriched with state that is checked at read time rather than
+ * persisted, so a folder deleted outside the app is reflected immediately.
+ */
+export type ProjectWithStatus = Project & {
+  pathExists: boolean;
+};
+
+/**
+ * Result of scanning a folder. Single source of truth -- the main-process
+ * detector and the renderer both import this rather than redeclaring it.
+ */
+export type DetectedProjectMeta = {
+  name: string;
+  tags: string[];
+  description?: string;
+  commands: ProjectCommand[];
+  details: {
+    languages: string[];
+    frameworks: string[];
+    packageManager?: string;
+    hasGit: boolean;
+    hasDocker: boolean;
+  };
 };
 
 export type ProjectMetadata = {

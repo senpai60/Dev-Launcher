@@ -5,15 +5,20 @@ import {
   Code2,
   Container,
   CornerDownLeft,
+  FileCode2,
+  FileWarning,
   FolderClosed,
   FolderOpen,
   GitBranch,
+  HardDrive,
   Home,
   LayoutGrid,
   Play,
+  Plug,
   Plus,
   Search,
   Settings,
+  Wrench,
 } from "lucide-react";
 import { useProjectContext } from "../../../context/ProjectContext";
 import { useCommandRunner } from "../../../hooks/useCommandRunner";
@@ -159,11 +164,55 @@ export const CommandPalette: React.FC = () => {
       },
     });
 
-    // 4. Navigation
+    // 4. Developer tools -- deep-linked so one keystroke lands on the tool.
+    const toolItems: Array<[string, string, string, React.ReactNode]> = [
+      [
+        "disk",
+        "Reclaim Disk Space",
+        "Find and delete stale node_modules folders",
+        <HardDrive size={18} key="hd" />,
+      ],
+      [
+        "ports",
+        "Free a Busy Port",
+        "See what's on port 3000 and stop it",
+        <Plug size={18} key="pl" />,
+      ],
+      [
+        "env",
+        "Check .env Files",
+        "Find missing environment keys across projects",
+        <FileWarning size={18} key="fw" />,
+      ],
+      [
+        "scripts",
+        "Search All Scripts",
+        "Find any package.json script across every project",
+        <FileCode2 size={18} key="fc" />,
+      ],
+    ];
+
+    for (const [tab, title, subtitle, icon] of toolItems) {
+      list.push({
+        id: `tool_${tab}`,
+        title,
+        subtitle,
+        category: "Quick Actions",
+        keywords: `tools ${tab} node_modules port env script disk`,
+        icon,
+        action: () => {
+          close();
+          navigate(`/tools?tab=${tab}`);
+        },
+      });
+    }
+
+    // 5. Navigation
     const navItems: Array<[string, string, React.ReactNode]> = [
       ["/", "Go to Dashboard", <Home size={18} key="h" />],
       ["/projects", "Go to Projects", <FolderClosed size={18} key="p" />],
       ["/commands", "Go to Commands", <Code2 size={18} key="c" />],
+      ["/tools", "Go to Tools", <Wrench size={18} key="wr" />],
       ["/apps", "Go to Apps & Tools", <AppWindow size={18} key="a" />],
       ["/workspaces", "Go to Workspaces", <LayoutGrid size={18} key="w" />],
       ["/git", "Go to Git", <GitBranch size={18} key="g" />],

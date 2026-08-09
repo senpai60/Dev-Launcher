@@ -5,6 +5,7 @@ import type * as SettingsTypes from './settings';
 import type * as HistoryTypes from './history';
 import type * as RuntimeTypes from './runtime';
 import type * as IntegrationTypes from './integration';
+import type * as ToolTypes from './tools';
 
 /** Result of validating a command configuration in the main process. */
 export interface CommandValidationResult {
@@ -105,6 +106,21 @@ declare global {
         selectFolder: (defaultPath?: string) => Promise<SelectedFolder | null>;
         pathExists: (target: string) => Promise<boolean>;
         openExternal: (url: string) => Promise<boolean>;
+      };
+      toolsAPI: {
+        scanDisk: () => Promise<ToolTypes.DiskScanResult>;
+        deleteModules: (targets: string[]) => Promise<ToolTypes.DeleteModulesResult>;
+        onDiskScanProgress: (
+          callback: (progress: ToolTypes.DiskScanProgress) => void,
+        ) => () => void;
+
+        listPorts: () => Promise<ToolTypes.PortScanResult>;
+        killPort: (pid: number, port: number) => Promise<ToolTypes.KillPortResult>;
+
+        auditEnv: (projectId?: string) => Promise<ToolTypes.EnvAuditResult>;
+
+        indexScripts: () => Promise<ToolTypes.ScriptIndexResult>;
+        runScript: (projectId: string, scriptName: string) => Promise<{ command: string }>;
       };
     };
   }

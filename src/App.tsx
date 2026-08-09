@@ -7,6 +7,7 @@ import CommandsPage from "./pages/commands/CommandsPage";
 import GitPage from "./pages/git/GitPage";
 import DockerPage from "./pages/docker/DockerPage";
 import AppsPage from "./pages/apps/AppsPage";
+import ToolsPage from "./pages/tools/ToolsPage";
 import Aside from "./components/layout/Aside/Aside";
 import CommandPalette from "./components/ui/CommandPalette/CommandPalette";
 
@@ -21,6 +22,7 @@ const App = () => {
           <Route path="/apps" element={<AppsPage />} />
           <Route path="/workspaces" element={<WorkspacesPage />} />
           <Route path="/commands" element={<CommandsPage />} />
+          <Route path="/tools" element={<ToolsPage />} />
           <Route path="/git" element={<GitPage />} />
           <Route path="/docker" element={<DockerPage />} />
           <Route path="/settings" element={<SettingsPage />} />

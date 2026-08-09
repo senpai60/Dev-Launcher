@@ -6,6 +6,7 @@ import type {
 } from "../../types/project";
 import type { ProjectGroup } from "../../types/group";
 import type { CommandValidationResult, SelectedFolder } from "../../types/global";
+import type { DiskScanProgress } from "../../types/tools";
 
 const PROJECTS_STORAGE_KEY = "dev_launcher_projects";
 const GROUPS_STORAGE_KEY = "dev_launcher_groups";
@@ -205,6 +206,37 @@ export const useSystemAPI = () => {
       window.open(url, "_blank", "noopener,noreferrer");
       return true;
     },
+  };
+};
+
+/**
+ * Developer utilities: disk reclaimer, ports, env doctor, script index.
+ * All of these need real OS access, so there is no browser fallback.
+ */
+export const useToolsAPI = () => {
+  const toolsApi = window?.api?.toolsAPI;
+
+  const require = () => {
+    if (!toolsApi) throw new Error(NO_DESKTOP);
+    return toolsApi;
+  };
+
+  return {
+    isAvailable: Boolean(toolsApi),
+
+    scanDisk: () => require().scanDisk(),
+    deleteModules: (targets: string[]) => require().deleteModules(targets),
+    onDiskScanProgress: (callback: (progress: DiskScanProgress) => void) =>
+      toolsApi ? toolsApi.onDiskScanProgress(callback) : () => {},
+
+    listPorts: () => require().listPorts(),
+    killPort: (pid: number, port: number) => require().killPort(pid, port),
+
+    auditEnv: (projectId?: string) => require().auditEnv(projectId),
+
+    indexScripts: () => require().indexScripts(),
+    runScript: (projectId: string, scriptName: string) =>
+      require().runScript(projectId, scriptName),
   };
 };
 

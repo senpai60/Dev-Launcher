@@ -28,6 +28,7 @@ const primaryLinks: NavLink[] = [
   { to: "/projects", label: "Projects", icon: "FolderClosed" },
   { to: "/workspaces", label: "Workspaces", icon: "LayoutGrid" },
   { to: "/commands", label: "Commands", icon: "Terminal" },
+  { to: "/tools", label: "Tools", icon: "Wrench" },
   { to: "/git", label: "Git", icon: "GitBranch" },
   { to: "/docker", label: "Docker", icon: "Container" },
   { to: "/apps", label: "Apps", icon: "AppWindow" },

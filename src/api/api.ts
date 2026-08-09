@@ -10,7 +10,9 @@ export const useProjectAPI = () => {
       if (projectApi) {
         return await projectApi.add(project);
       } else {
-        const stored: Project[] = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+        const stored: Project[] = JSON.parse(
+          localStorage.getItem(STORAGE_KEY) || "[]",
+        );
         stored.push(project);
         localStorage.setItem(STORAGE_KEY, JSON.stringify(stored));
         return project;
@@ -21,8 +23,12 @@ export const useProjectAPI = () => {
       if (projectApi) {
         return await projectApi.update(id, data);
       } else {
-        const stored: Project[] = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
-        const updated = stored.map((p) => (p.id === id ? { ...p, ...data } : p));
+        const stored: Project[] = JSON.parse(
+          localStorage.getItem(STORAGE_KEY) || "[]",
+        );
+        const updated = stored.map((p) =>
+          p.id === id ? { ...p, ...data } : p,
+        );
         localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
         return true;
       }
@@ -32,7 +38,9 @@ export const useProjectAPI = () => {
       if (projectApi) {
         return await projectApi.delete(id);
       } else {
-        const stored: Project[] = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+        const stored: Project[] = JSON.parse(
+          localStorage.getItem(STORAGE_KEY) || "[]",
+        );
         const updated = stored.filter((p) => p.id !== id);
         localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
         return true;
@@ -51,7 +59,19 @@ export const useProjectAPI = () => {
       if (projectApi) {
         return await projectApi.get(id);
       } else {
-        const stored: Project[] = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+        const stored: Project[] = JSON.parse(
+          localStorage.getItem(STORAGE_KEY) || "[]",
+        );
+        return stored.find((p) => p.id === id) || null;
+      }
+    },
+    launchProject: async (id: string, action: string) => {
+      if (projectApi) {
+        return await projectApi.launch(id, action);
+      } else {
+        const stored: Project[] = JSON.parse(
+          localStorage.getItem(STORAGE_KEY) || "[]",
+        );
         return stored.find((p) => p.id === id) || null;
       }
     },

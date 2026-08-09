@@ -42,6 +42,7 @@ declare global {
         add: (project: Project) => Promise<void>;
         update: (id: string, data: Partial<Project>) => Promise<void>;
         delete: (id: string) => Promise<void>;
+        launch: (id: string, action: string) => Promise<void>;
       };
     };
   }

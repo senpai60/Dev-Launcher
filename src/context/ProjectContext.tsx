@@ -10,6 +10,7 @@ type ProjectContextValue = {
   editProject: (id: string, data: Partial<Project>) => Promise<void>;
   loadAllProjects: () => Promise<void>;
   loadProject: (id: string) => Promise<void>;
+  openProject: (id: string, action: string) => Promise<void>;
 };
 
 export const ProjectContextProvider = ({
@@ -26,6 +27,7 @@ export const ProjectContextProvider = ({
     deleteProject,
     getAllProjects,
     getProject,
+    launchProject,
   } = useProjectAPI();
 
   // hooks
@@ -57,6 +59,10 @@ export const ProjectContextProvider = ({
     setProject(project);
   };
 
+  const openProject = async (id: string, action: string) => {
+    await launchProject(id, action);
+  };
+
   const value: ProjectContextValue = {
     allProjects,
     project,
@@ -65,6 +71,7 @@ export const ProjectContextProvider = ({
     editProject,
     loadAllProjects,
     loadProject,
+    openProject,
   };
 
   return (

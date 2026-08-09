@@ -7,6 +7,7 @@ const dataDir = (): string => {
   mkdirSync(dir, { recursive: true });
   return dir;
 };
+console.log(app.getPath("userData"));
 
 const dataPath = (filename: string): string => {
   return join(dataDir(), `${filename}.json`);

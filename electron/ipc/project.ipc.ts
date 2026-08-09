@@ -5,6 +5,7 @@ import {
   addProject,
   updateProject,
   deleteProject,
+  launchProject,
 } from "../services/project.service";
 
 export function registerProjectIPC() {
@@ -26,5 +27,17 @@ export function registerProjectIPC() {
 
   ipcMain.handle("projects:delete", (_, id: string) => {
     return deleteProject(id);
+  });
+
+  ipcMain.handle("projects:launch", async (_, id: string, action: string) => {
+    return new Promise((resolve, reject) => {
+      launchProject(id, action, false, (error, stdout) => {
+        if (error) {
+          reject(error);
+        } else {
+          resolve(stdout);
+        }
+      });
+    });
   });
 }

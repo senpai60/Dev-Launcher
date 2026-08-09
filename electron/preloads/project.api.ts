@@ -11,4 +11,7 @@ export const projectAPI = {
     ipcRenderer.invoke("projects:update", id, data),
 
   delete: (id: string) => ipcRenderer.invoke("projects:delete", id),
+
+  launch: (id: string, action: string) =>
+    ipcRenderer.invoke("projects:launch", id, action),
 };

@@ -1,0 +1,12 @@
+:root {
+  --bg-primary: #1d1d1d;
+  --bg-secordary: #222222;
+  --bg-tirtiary: #2f2f2f;
+  --bg-quaternary: #ffffff;
+
+  --card-surface: var(--bg-secordary);
+
+  --button-solid: var(--bg-quaternary);
+  --button-inside: var(--bg-tirtiary);
+  --button-ghost: #2b2b2b;
+}

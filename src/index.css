@@ -1,5 +1,6 @@
 @import "./css/variable.css";
 @import "./css/typography.css";
+@import "./css/scroller.css";
 
 * {
   margin: 0;

@@ -61,7 +61,7 @@ export const Dialog: React.FC<DialogProps> = ({
           </button>
         </div>
 
-        <div className="dialog-body">{children}</div>
+        <div className="dialog-body custom-scroller">{children}</div>
 
         {footer && <div className="dialog-footer">{footer}</div>}
       </div>

@@ -8,6 +8,7 @@ import GitPage from "./pages/git/GitPage";
 import DockerPage from "./pages/docker/DockerPage";
 import AppsPage from "./pages/apps/AppsPage";
 import Aside from "./components/layout/Aside/Aside";
+import CommandPalette from "./components/ui/CommandPalette/CommandPalette";
 
 const App = () => {
   return (
@@ -24,6 +25,7 @@ const App = () => {
           <Route path="/docker" element={<DockerPage />} />
           <Route path="/settings" element={<SettingsPage />} />
         </Routes>
+        <CommandPalette />
       </main>
     </Router>
   );

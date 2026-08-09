@@ -1,0 +1,58 @@
+/* ==========================================================================
+   Custom Scroller & Theme-Matched Scrollbar System
+   ========================================================================== */
+
+/* Global WebKit scrollbar styling for Electron / Chromium */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: var(--bg-tirtiary);
+  border-radius: 9999px;
+  transition: background-color 0.2s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--text-tertiary);
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Firefox custom scrollbar standards */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--bg-tirtiary) transparent;
+}
+
+/* Reusable `.custom-scroller` Utility Class */
+.custom-scroller {
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--bg-tirtiary) transparent;
+}
+
+.custom-scroller::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.custom-scroller::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scroller::-webkit-scrollbar-thumb {
+  background-color: var(--bg-tirtiary);
+  border-radius: 9999px;
+}
+
+.custom-scroller::-webkit-scrollbar-thumb:hover {
+  background-color: var(--text-tertiary);
+}

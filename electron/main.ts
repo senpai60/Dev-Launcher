@@ -5,6 +5,7 @@ import { registerProjectIPC } from "./ipc/project.ipc";
 import { registerGroupIPC } from "./ipc/group.ipc";
 import { registerDialogIPC } from "./ipc/dialog.ipc";
 import { registerToolsIPC } from "./ipc/tools.ipc";
+import { registerSessionIPC } from "./ipc/session.ipc";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -95,5 +96,6 @@ app.whenReady().then(() => {
   registerGroupIPC();
   registerDialogIPC();
   registerToolsIPC();
+  registerSessionIPC();
   createWindow();
 });

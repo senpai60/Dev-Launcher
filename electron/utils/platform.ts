@@ -10,6 +10,12 @@ export type SpawnSpec = {
   args: string[];
   /** True when the process detaches and we cannot observe its exit code. */
   detached: boolean;
+  /**
+   * Pass `args` to CreateProcess verbatim instead of letting Node re-quote
+   * them. Required for the `cmd.exe /s /c "..."` form below, where we have
+   * already done the quoting ourselves.
+   */
+  verbatim?: boolean;
 };
 
 export const isWindows = process.platform === "win32";
@@ -74,6 +80,38 @@ export const EDITOR_BINARIES: Record<string, { bin: string; label: string }> = {
   antigravity: { bin: "agy", label: "Antigravity" },
 };
 
+/**
+ * Runs a Windows `.cmd`/`.bat` shim safely.
+ *
+ * Node refuses to spawn batch files unless they go through a shell (the
+ * CVE-2024-27980 fix), so these have to run via `cmd.exe`. Rather than using
+ * `shell: true` -- which would let a folder name containing `&` inject a second
+ * command -- we build the command line ourselves and pass it verbatim:
+ *
+ *     cmd.exe /d /s /c ""C:\path\code.cmd" "C:\my project""
+ *
+ * `/s` makes cmd strip only the outermost quote pair and treat the rest
+ * literally, so `&`, `^` and `|` inside the quoted path stay inert. Windows
+ * paths cannot contain a double quote, so the quoting cannot be broken out of.
+ *
+ * The binary name is deliberately left unquoted. It is a fixed constant from
+ * EDITOR_BINARIES with no spaces or metacharacters, and quoting a bare
+ * PATH-resolved name breaks `%~dp0` inside the shim -- VS Code's `code.cmd`
+ * would then look for `Code.exe` relative to the working directory instead of
+ * its own install folder.
+ */
+function windowsShimSpec(binary: string, args: string[]): SpawnSpec {
+  const quote = (value: string) => (value.startsWith("-") ? value : `"${value}"`);
+  const line = [binary, ...args.map(quote)].join(" ");
+
+  return {
+    command: "cmd.exe",
+    args: ["/d", "/s", "/c", `"${line}"`],
+    detached: false,
+    verbatim: true,
+  };
+}
+
 export function editorSpec(
   editorKey: string,
   absolutePath: string,
@@ -84,13 +122,10 @@ export function editorSpec(
 
   const args = editorKey === "vscode" ? [newWindow ? "-n" : "-r", absolutePath] : [absolutePath];
 
-  // On Windows these ship as .cmd shims, which CreateProcess cannot execute
-  // directly -- they have to go through the shell.
-  return {
-    command: isWindows ? `${editor.bin}.cmd` : editor.bin,
-    args,
-    detached: false,
-  };
+  // On Windows these ship as .cmd shims and must go through cmd.exe.
+  if (isWindows) return windowsShimSpec(`${editor.bin}.cmd`, args);
+
+  return { command: editor.bin, args, detached: false };
 }
 
 /** Default shell used for captured (non-terminal) command runs. */

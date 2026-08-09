@@ -21,6 +21,32 @@ export function formatCount(value: number): string {
   return value.toLocaleString();
 }
 
+/**
+ * Best-effort repository name from a git URL, used to preview the destination
+ * folder before the main process validates it properly.
+ */
+export function parseRepoNameFromUrl(url: string): string {
+  const trimmed = url.trim();
+  if (!trimmed) return "";
+
+  const scpMatch = /^[A-Za-z0-9_.-]+@[A-Za-z0-9_.-]+:(.+)$/.exec(trimmed);
+  let candidate = scpMatch ? scpMatch[1] : "";
+
+  if (!candidate) {
+    try {
+      candidate = new URL(trimmed).pathname;
+    } catch {
+      return "";
+    }
+  }
+
+  const last = candidate.split("/").filter(Boolean).pop();
+  if (!last) return "";
+
+  const name = last.replace(/\.git$/i, "");
+  return /^[A-Za-z0-9._-]+$/.test(name) ? name : "";
+}
+
 export function formatDaysAgo(days: number | null): string {
   if (days === null) return "Never opened here";
   if (days === 0) return "Opened today";

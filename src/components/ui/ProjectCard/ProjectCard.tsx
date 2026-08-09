@@ -1,7 +1,16 @@
 import React, { useState } from "react";
-import { AlertTriangle, MoreHorizontal, Play, Star, Terminal } from "lucide-react";
+import {
+  AlertTriangle,
+  Loader2,
+  MoreHorizontal,
+  Play,
+  RotateCcw,
+  Star,
+  Terminal,
+} from "lucide-react";
 import vscodeIcon from "../../../app-icons/vscode.svg";
 import ContextMenu, { ContextMenuItem } from "../ContextMenu/ContextMenu";
+import "../Session/session.css";
 import "./projectCard.css";
 
 /** How many tag chips fit before the rest collapse into a "+N". */
@@ -17,6 +26,8 @@ export interface ProjectCardData {
   isFavorite?: boolean;
   pathExists?: boolean;
   commandCount?: number;
+  /** Enabled steps in this project's resumable session. */
+  sessionStepCount?: number;
 }
 
 export interface ProjectCardProps {
@@ -27,6 +38,8 @@ export interface ProjectCardProps {
   onOpenTerminal?: (project: ProjectCardData) => void;
   onClickCard?: (project: ProjectCardData) => void;
   onLocate?: (project: ProjectCardData) => void;
+  onResume?: (project: ProjectCardData) => void;
+  isResuming?: boolean;
   menuItems?: ContextMenuItem[];
 }
 
@@ -38,9 +51,12 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
   onOpenTerminal,
   onClickCard,
   onLocate,
+  onResume,
+  isResuming = false,
   menuItems = [],
 }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const canResume = Boolean(onResume) && (project.sessionStepCount ?? 0) > 0;
 
   const isMissing = project.pathExists === false;
   const visibleTags = project.tags.slice(0, MAX_VISIBLE_TAGS);
@@ -117,14 +133,30 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
       )}
 
       <div className="project-card-actions">
-        <button
-          className="card-btn"
-          title={isMissing ? "The project folder is missing" : "Open Project Folder"}
-          onClick={() => onOpenFolder?.(project)}
-          disabled={isMissing}
-        >
-          Open
-        </button>
+        {canResume ? (
+          <button
+            className="card-resume-btn"
+            title={`Replay ${project.sessionStepCount} saved step${project.sessionStepCount === 1 ? "" : "s"}`}
+            onClick={() => onResume?.(project)}
+            disabled={isMissing || isResuming}
+          >
+            {isResuming ? (
+              <Loader2 size={13} className="tool-spinner" />
+            ) : (
+              <RotateCcw size={13} />
+            )}
+            <span>{isResuming ? "Resuming" : "Resume"}</span>
+          </button>
+        ) : (
+          <button
+            className="card-btn"
+            title={isMissing ? "The project folder is missing" : "Open Project Folder"}
+            onClick={() => onOpenFolder?.(project)}
+            disabled={isMissing}
+          >
+            Open
+          </button>
+        )}
         <button
           className="card-btn icon-only"
           title="Open in VS Code"

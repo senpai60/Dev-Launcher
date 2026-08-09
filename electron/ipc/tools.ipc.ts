@@ -3,10 +3,20 @@ import { deleteNodeModules, scanNodeModules } from "../services/disk.service";
 import { killByPid, listPorts } from "../services/ports.service";
 import { auditEnvironments } from "../services/env.service";
 import { indexScripts, runScript } from "../services/scripts.service";
-import { handler, requireId, requireString } from "./validate";
+import { scanRadar } from "../services/radar.service";
+import { cloneAndSetup } from "../services/clone.service";
+import { validateCloneUrl } from "../utils/git";
+import { handler, optionalBoolean, requireId, requireObject, requireString } from "./validate";
 
 /** Upper bound on a single bulk delete, as a guard against a runaway UI. */
 const MAX_DELETE_TARGETS = 200;
+
+/** Broadcasts an event to every open window. */
+function broadcast(channel: string, payload: unknown) {
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (!win.isDestroyed()) win.webContents.send(channel, payload);
+  }
+}
 
 export function registerToolsIPC() {
   /* ---------------------------------------------------------------------- */
@@ -21,12 +31,7 @@ export function registerToolsIPC() {
 
       // Progress is pushed to every open window so the UI can show which
       // project is being measured during a long scan.
-      const windows = BrowserWindow.getAllWindows();
-      return scanNodeModules((progress) => {
-        for (const win of windows) {
-          if (!win.isDestroyed()) win.webContents.send("tools:diskScanProgress", progress);
-        }
-      });
+      return scanNodeModules((progress) => broadcast("tools:diskScanProgress", progress));
     }),
   );
 
@@ -105,6 +110,56 @@ export function registerToolsIPC() {
       }
       const { command } = await runScript(requireId(projectId, "Project id"), name);
       return { command };
+    }),
+  );
+
+  /* ---------------------------------------------------------------------- */
+  /*  Stale project radar                                                    */
+  /* ---------------------------------------------------------------------- */
+
+  ipcMain.handle(
+    "tools:scanRadar",
+    handler("tools:scanRadar", () =>
+      scanRadar((progress) => broadcast("tools:radarProgress", progress)),
+    ),
+  );
+
+  /* ---------------------------------------------------------------------- */
+  /*  Clone to running                                                       */
+  /* ---------------------------------------------------------------------- */
+
+  /** Cheap pre-flight so the form can validate before the user commits. */
+  ipcMain.handle(
+    "tools:validateCloneUrl",
+    handler("tools:validateCloneUrl", (url: unknown) =>
+      validateCloneUrl(typeof url === "string" ? url : ""),
+    ),
+  );
+
+  ipcMain.handle(
+    "tools:clone",
+    handler("tools:clone", (request: unknown) => {
+      const input = requireObject(request, "Clone request");
+
+      return cloneAndSetup(
+        {
+          url: requireString(input.url, "Repository URL"),
+          destinationParent: requireString(input.destinationParent, "Destination folder"),
+          folderName:
+            typeof input.folderName === "string" && input.folderName.trim()
+              ? input.folderName.trim()
+              : undefined,
+          installDependencies: optionalBoolean(
+            input.installDependencies,
+            "Install dependencies flag",
+          ),
+          openInEditor:
+            typeof input.openInEditor === "string" && input.openInEditor
+              ? input.openInEditor
+              : undefined,
+        },
+        (progress) => broadcast("tools:cloneProgress", progress),
+      );
     }),
   );
 }

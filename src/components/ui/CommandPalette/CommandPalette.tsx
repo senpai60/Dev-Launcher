@@ -5,6 +5,7 @@ import {
   Code2,
   Container,
   CornerDownLeft,
+  DownloadCloud,
   FileCode2,
   FileWarning,
   FolderClosed,
@@ -16,12 +17,16 @@ import {
   Play,
   Plug,
   Plus,
+  Radar,
+  RotateCcw,
   Search,
   Settings,
   Wrench,
 } from "lucide-react";
 import { useProjectContext } from "../../../context/ProjectContext";
+import { useSessionAPI } from "../../../api/api";
 import { useCommandRunner } from "../../../hooks/useCommandRunner";
+import { useSessionResume } from "../../../hooks/useSessionResume";
 import { fuzzyScoreFields } from "../../../utils/fuzzy";
 import "./commandPalette.css";
 
@@ -53,10 +58,15 @@ export const CommandPalette: React.FC = () => {
 
   const navigate = useNavigate();
   const projectCtx = useProjectContext();
+  const sessionApi = useSessionAPI();
   const { requestRun, confirmElement } = useCommandRunner();
+  const { resume } = useSessionResume();
 
   const allProjects = projectCtx?.allProjects;
   const openProject = projectCtx?.openProject;
+
+  /** Enabled step counts, refreshed each time the palette opens. */
+  const [sessionCounts, setSessionCounts] = useState<Record<string, number>>({});
 
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
@@ -73,11 +83,33 @@ export const CommandPalette: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (isOpen) {
-      setSearchQuery("");
-      setSelectedIndex(0);
-      window.setTimeout(() => inputRef.current?.focus(), 50);
-    }
+    if (!isOpen) return;
+
+    setSearchQuery("");
+    setSelectedIndex(0);
+    window.setTimeout(() => inputRef.current?.focus(), 50);
+
+    // Sessions are captured in main as the user works, so re-read on open.
+    if (!sessionApi.isAvailable) return;
+    let cancelled = false;
+    void sessionApi
+      .getAllSessions()
+      .then((sessions) => {
+        if (cancelled) return;
+        setSessionCounts(
+          Object.fromEntries(
+            sessions.map((s) => [s.projectId, s.steps.filter((step) => step.enabled).length]),
+          ),
+        );
+      })
+      .catch(() => {
+        // Resume entries simply won't appear.
+      });
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
   const close = () => setIsOpen(false);
@@ -88,6 +120,26 @@ export const CommandPalette: React.FC = () => {
   const items = useMemo<CommandPaletteItem[]>(() => {
     const list: CommandPaletteItem[] = [];
     const projects = allProjects ?? [];
+
+    // 0. Resume a whole startup routine -- the fastest path back into work.
+    for (const project of projects) {
+      const stepCount = sessionCounts[project.id] ?? 0;
+      if (stepCount === 0) continue;
+
+      list.push({
+        id: `resume_${project.id}`,
+        title: `Resume ${project.name}`,
+        subtitle: `Replay ${stepCount} saved step${stepCount === 1 ? "" : "s"}`,
+        category: "Commands",
+        keywords: `session restore continue ${project.tags?.join(" ") ?? ""}`,
+        badge: project.pathExists ? "Resume" : "Folder missing",
+        icon: <RotateCcw size={18} />,
+        action: () => {
+          close();
+          if (project.pathExists) void resume(project.id, project.name);
+        },
+      });
+    }
 
     // 1. Runnable project commands -- the core Phase 5 palette entry.
     for (const project of projects) {
@@ -167,6 +219,18 @@ export const CommandPalette: React.FC = () => {
     // 4. Developer tools -- deep-linked so one keystroke lands on the tool.
     const toolItems: Array<[string, string, string, React.ReactNode]> = [
       [
+        "radar",
+        "Check Project Health",
+        "Find uncommitted work and unpushed commits",
+        <Radar size={18} key="rd" />,
+      ],
+      [
+        "clone",
+        "Clone a Repository",
+        "Clone, detect, install, and open in one step",
+        <DownloadCloud size={18} key="dc" />,
+      ],
+      [
         "disk",
         "Reclaim Disk Space",
         "Find and delete stale node_modules folders",
@@ -235,7 +299,7 @@ export const CommandPalette: React.FC = () => {
 
     return list;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allProjects]);
+  }, [allProjects, sessionCounts]);
 
   /** Fuzzy-ranked, then regrouped so categories stay in a stable order. */
   const { grouped, flatItems } = useMemo(() => {

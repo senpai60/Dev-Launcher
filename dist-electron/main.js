@@ -1,92 +1,73 @@
-import { app, ipcMain, BrowserWindow, dialog, shell } from "electron";
-import { fileURLToPath } from "node:url";
-import path, { join } from "node:path";
-import fs, { existsSync, readFileSync, writeFileSync, renameSync, unlinkSync, copyFileSync, mkdirSync, promises } from "fs";
-import { randomUUID, createHash } from "node:crypto";
-import { spawn, execFile } from "child_process";
-import path$1 from "path";
-const SCHEMA_VERSION = 1;
-const dataDir = () => {
-  const dir = join(app.getPath("userData"), "DevLauncher");
-  mkdirSync(dir, { recursive: true });
-  return dir;
-};
-const dataPath = (filename) => join(dataDir(), `${filename}.json`);
-const quarantine = (filename) => {
-  const source = dataPath(filename);
-  if (!existsSync(source)) return null;
-  const backup = join(dataDir(), `${filename}.corrupt-${Date.now()}.json`);
+import { app as B, ipcMain as f, BrowserWindow as _, dialog as ge, shell as re } from "electron";
+import { fileURLToPath as Ke } from "node:url";
+import p, { join as ce } from "node:path";
+import h, { existsSync as de, readFileSync as Ye, writeFileSync as Ze, renameSync as Xe, unlinkSync as Qe, copyFileSync as et, mkdirSync as tt, promises as j } from "fs";
+import { randomUUID as nt, createHash as ot } from "node:crypto";
+import { spawn as Ae, execFile as st } from "child_process";
+import W from "path";
+const xe = 1, Ne = () => {
+  const e = ce(B.getPath("userData"), "DevLauncher");
+  return tt(e, { recursive: !0 }), e;
+}, le = (e) => ce(Ne(), `${e}.json`), rt = (e) => {
+  const t = le(e);
+  if (!de(t)) return null;
+  const n = ce(Ne(), `${e}.corrupt-${Date.now()}.json`);
   try {
-    copyFileSync(source, backup);
-    return backup;
-  } catch (e) {
-    console.error(`Could not quarantine ${filename}.json:`, e);
-    return null;
+    return et(t, n), n;
+  } catch (o) {
+    return console.error(`Could not quarantine ${e}.json:`, o), null;
   }
-};
-const migrate = (parsed, filename) => {
-  if (Array.isArray(parsed)) {
-    console.log(`Migrating ${filename}.json from v0 (bare array) to v${SCHEMA_VERSION}`);
-    return parsed;
-  }
-  if (parsed && typeof parsed === "object" && Array.isArray(parsed.data)) {
-    return parsed.data;
-  }
-  throw new Error(`Unrecognised shape in ${filename}.json`);
-};
-const readData = (filename) => {
-  const source = dataPath(filename);
-  if (!existsSync(source)) return [];
-  let raw;
+}, it = (e, t) => {
+  if (Array.isArray(e))
+    return console.log(`Migrating ${t}.json from v0 (bare array) to v${xe}`), e;
+  if (e && typeof e == "object" && Array.isArray(e.data))
+    return e.data;
+  throw new Error(`Unrecognised shape in ${t}.json`);
+}, ue = (e) => {
+  const t = le(e);
+  if (!de(t)) return [];
+  let n;
   try {
-    raw = readFileSync(source, "utf8");
-  } catch (e) {
-    console.error(`Could not read ${filename}.json:`, e);
-    throw new Error(`Unable to read ${filename} storage.`);
+    n = Ye(t, "utf8");
+  } catch (o) {
+    throw console.error(`Could not read ${e}.json:`, o), new Error(`Unable to read ${e} storage.`);
   }
-  if (raw.trim() === "") return [];
+  if (n.trim() === "") return [];
   try {
-    return migrate(JSON.parse(raw), filename);
-  } catch (e) {
-    const backup = quarantine(filename);
-    console.error(
-      `${filename}.json is corrupt and was backed up to ${backup ?? "(backup failed)"}:`,
-      e
-    );
-    throw new Error(
-      `${filename}.json could not be read and was backed up. Starting from an empty list.`
+    return it(JSON.parse(n), e);
+  } catch (o) {
+    const s = rt(e);
+    throw console.error(
+      `${e}.json is corrupt and was backed up to ${s ?? "(backup failed)"}:`,
+      o
+    ), new Error(
+      `${e}.json could not be read and was backed up. Starting from an empty list.`
     );
   }
-};
-const writeData = (filename, data) => {
-  const target = dataPath(filename);
-  const temp = `${target}.tmp`;
-  const envelope = { version: SCHEMA_VERSION, data };
+}, K = (e, t) => {
+  const n = le(e), o = `${n}.tmp`, s = { version: xe, data: t };
   try {
-    writeFileSync(temp, JSON.stringify(envelope, null, 2), "utf8");
-    renameSync(temp, target);
-  } catch (e) {
-    console.error(`Error saving ${filename}.json:`, e);
+    Ze(o, JSON.stringify(s, null, 2), "utf8"), Xe(o, n);
+  } catch (i) {
+    console.error(`Error saving ${e}.json:`, i);
     try {
-      if (existsSync(temp)) unlinkSync(temp);
+      de(o) && Qe(o);
     } catch {
     }
-    throw new Error(`Unable to save ${filename}. Your changes were not written to disk.`);
+    throw new Error(`Unable to save ${e}. Your changes were not written to disk.`);
   }
 };
-function readProjects() {
-  return readData("projects");
+function P() {
+  return ue("projects");
 }
-function writeProjects(projects) {
-  writeData("projects", projects);
+function pe(e) {
+  K("projects", e);
 }
-function generateId(prefix = "id") {
-  const uuid = randomUUID().replace(/-/g, "").slice(0, 12);
-  return `${prefix}_${uuid}`;
+function T(e = "id") {
+  const t = nt().replace(/-/g, "").slice(0, 12);
+  return `${e}_${t}`;
 }
-const MAX_NAME_LENGTH = 80;
-const MAX_COMMAND_LENGTH = 2e3;
-const DESTRUCTIVE_PATTERNS = [
+const we = 80, ye = 2e3, at = [
   { pattern: /\brm\s+(-[a-z]*[rf][a-z]*\s+)+/i, reason: "recursively deletes files (rm -rf)" },
   { pattern: /\brmdir\s+\/s\b/i, reason: "recursively deletes a directory (rmdir /s)" },
   { pattern: /\bdel\s+\/[qsf]/i, reason: "force-deletes files (del /f)" },
@@ -105,354 +86,440 @@ const DESTRUCTIVE_PATTERNS = [
   { pattern: /\b(shutdown|reboot)\b/i, reason: "shuts down or restarts the machine" },
   { pattern: />\s*\/dev\/sd[a-z]/i, reason: "writes directly to a block device" }
 ];
-function checkDestructive(command) {
-  for (const { pattern, reason } of DESTRUCTIVE_PATTERNS) {
-    if (pattern.test(command)) {
-      return { destructive: true, reason };
-    }
-  }
-  return { destructive: false };
+function ct(e) {
+  for (const { pattern: t, reason: n } of at)
+    if (t.test(e))
+      return { destructive: !0, reason: n };
+  return { destructive: !1 };
 }
-function validateCommand(input, projectPath) {
-  const errors = [];
-  const name = (input.name ?? "").trim();
-  const command = (input.command ?? "").trim();
-  const workingDirectory = (input.workingDirectory ?? "").trim();
-  if (!name) {
-    errors.push("Command name is required.");
-  } else if (name.length > MAX_NAME_LENGTH) {
-    errors.push(`Command name must be ${MAX_NAME_LENGTH} characters or fewer.`);
-  }
-  if (!command) {
-    errors.push("Command string is required.");
-  } else if (command.length > MAX_COMMAND_LENGTH) {
-    errors.push(`Command string must be ${MAX_COMMAND_LENGTH} characters or fewer.`);
-  }
-  if (/[\r\n]/.test(command)) {
-    errors.push("Command string cannot span multiple lines.");
-  }
-  if (/\0/.test(command) || /\0/.test(name)) {
-    errors.push("Command contains invalid characters.");
-  }
-  if (workingDirectory) {
-    if (path.isAbsolute(workingDirectory)) {
-      errors.push("Working directory must be relative to the project folder.");
-    } else if (workingDirectory.split(/[/\\]/).includes("..")) {
-      errors.push("Working directory cannot escape the project folder.");
-    } else if (projectPath) {
-      const resolved = path.resolve(projectPath, workingDirectory);
-      if (!resolved.startsWith(path.resolve(projectPath))) {
-        errors.push("Working directory cannot escape the project folder.");
-      } else if (!fs.existsSync(resolved)) {
-        errors.push(`Working directory "${workingDirectory}" does not exist.`);
-      }
+function O(e, t) {
+  const n = [], o = (e.name ?? "").trim(), s = (e.command ?? "").trim(), i = (e.workingDirectory ?? "").trim();
+  if (o ? o.length > we && n.push(`Command name must be ${we} characters or fewer.`) : n.push("Command name is required."), s ? s.length > ye && n.push(`Command string must be ${ye} characters or fewer.`) : n.push("Command string is required."), /[\r\n]/.test(s) && n.push("Command string cannot span multiple lines."), (/\0/.test(s) || /\0/.test(o)) && n.push("Command contains invalid characters."), i) {
+    if (p.isAbsolute(i))
+      n.push("Working directory must be relative to the project folder.");
+    else if (i.split(/[/\\]/).includes(".."))
+      n.push("Working directory cannot escape the project folder.");
+    else if (t) {
+      const c = p.resolve(t, i);
+      c.startsWith(p.resolve(t)) ? h.existsSync(c) || n.push(`Working directory "${i}" does not exist.`) : n.push("Working directory cannot escape the project folder.");
     }
   }
-  const { destructive, reason } = checkDestructive(command);
+  const { destructive: r, reason: a } = ct(s);
   return {
-    valid: errors.length === 0,
-    errors,
-    requiresConfirmation: destructive,
-    destructiveReason: reason
+    valid: n.length === 0,
+    errors: n,
+    requiresConfirmation: r,
+    destructiveReason: a
   };
 }
-function resolveWorkingDirectory(projectPath, workingDirectory) {
-  const root = path.resolve(projectPath);
-  if (!workingDirectory || !workingDirectory.trim()) return root;
-  const resolved = path.resolve(root, workingDirectory.trim());
-  if (!resolved.startsWith(root)) {
+function De(e, t) {
+  const n = p.resolve(e);
+  if (!t || !t.trim()) return n;
+  const o = p.resolve(n, t.trim());
+  if (!o.startsWith(n))
     throw new Error("Working directory escapes the project folder.");
-  }
-  if (!fs.existsSync(resolved)) {
-    throw new Error(`Working directory "${workingDirectory}" does not exist.`);
-  }
-  return resolved;
+  if (!h.existsSync(o))
+    throw new Error(`Working directory "${t}" does not exist.`);
+  return o;
 }
-const isWindows = process.platform === "win32";
-const isMac = process.platform === "darwin";
-function fileManagerSpec(absolutePath) {
-  if (isWindows) {
-    return { command: "explorer.exe", args: [absolutePath], detached: true };
-  }
-  if (isMac) {
-    return { command: "open", args: [absolutePath], detached: true };
-  }
-  return { command: "xdg-open", args: [absolutePath], detached: true };
+const G = process.platform === "win32", $e = process.platform === "darwin";
+function dt(e) {
+  return G ? { command: "explorer.exe", args: [e], detached: !0 } : $e ? { command: "open", args: [e], detached: !0 } : { command: "xdg-open", args: [e], detached: !0 };
 }
-function terminalSpec(cwd, runCommand) {
-  if (isWindows) {
-    const inner = runCommand ? ["cmd", "/k", runCommand] : ["cmd", "/k"];
-    return {
-      command: "cmd",
-      args: ["/c", "start", "", ...inner],
-      detached: true
-    };
-  }
-  if (isMac) {
-    if (!runCommand) {
-      return { command: "open", args: ["-a", "Terminal", cwd], detached: true };
-    }
-    const script = `tell application "Terminal" to do script "cd ${shellQuote(cwd)} && ${runCommand.replace(/"/g, '\\"')}"`;
-    return { command: "osascript", args: ["-e", script], detached: true };
-  }
-  const args = runCommand ? ["-e", `bash -c '${runCommand.replace(/'/g, "'\\''")}; exec bash'`] : [];
-  return { command: "x-terminal-emulator", args, detached: true };
+function Pe(e, t) {
+  return G ? {
+    command: "cmd",
+    args: ["/c", "start", "", ...t ? ["cmd", "/k", t] : ["cmd", "/k"]],
+    detached: !0
+  } : $e ? t ? { command: "osascript", args: ["-e", `tell application "Terminal" to do script "cd ${pt(e)} && ${t.replace(/"/g, '\\"')}"`], detached: !0 } : { command: "open", args: ["-a", "Terminal", e], detached: !0 } : { command: "x-terminal-emulator", args: t ? ["-e", `bash -c '${t.replace(/'/g, "'\\''")}; exec bash'`] : [], detached: !0 };
 }
-const EDITOR_BINARIES = {
+const F = {
   vscode: { bin: "code", label: "VS Code" },
   cursor: { bin: "cursor", label: "Cursor" },
   antigravity: { bin: "agy", label: "Antigravity" }
 };
-function editorSpec(editorKey, absolutePath, newWindow) {
-  const editor = EDITOR_BINARIES[editorKey];
-  if (!editor) return null;
-  const args = editorKey === "vscode" ? [newWindow ? "-n" : "-r", absolutePath] : [absolutePath];
+function lt(e, t) {
+  const n = (s) => s.startsWith("-") ? s : `"${s}"`;
   return {
-    command: isWindows ? `${editor.bin}.cmd` : editor.bin,
-    args,
-    detached: false
+    command: "cmd.exe",
+    args: ["/d", "/s", "/c", `"${[e, ...t.map(n)].join(" ")}"`],
+    detached: !1,
+    verbatim: !0
   };
 }
-function shellQuote(value) {
-  return value.replace(/(["\s'$`\\])/g, "\\$1");
+function ut(e, t, n) {
+  const o = F[e];
+  if (!o) return null;
+  const s = e === "vscode" ? [n ? "-n" : "-r", t] : [t];
+  return G ? lt(`${o.bin}.cmd`, s) : { command: o.bin, args: s, detached: !1 };
 }
-function run(spec, cwd) {
-  return new Promise((resolve, reject) => {
-    let child;
+function pt(e) {
+  return e.replace(/(["\s'$`\\])/g, "\\$1");
+}
+function Y(e, t) {
+  return new Promise((n, o) => {
+    var a;
+    let s;
     try {
-      child = spawn(spec.command, spec.args, {
-        cwd,
-        shell: false,
-        detached: spec.detached,
-        stdio: "ignore",
-        windowsHide: false
+      s = Ae(e.command, e.args, {
+        cwd: t,
+        shell: !1,
+        detached: e.detached,
+        // Detached windows own their own console. For everything else we keep
+        // stderr so a failure can be explained instead of reported as a bare
+        // exit code.
+        stdio: e.detached ? "ignore" : ["ignore", "ignore", "pipe"],
+        windowsHide: !1,
+        windowsVerbatimArguments: e.verbatim ?? !1
       });
-    } catch (e) {
-      reject(e);
+    } catch (c) {
+      o(c);
       return;
     }
-    let settled = false;
-    child.on("error", (err) => {
-      if (settled) return;
-      settled = true;
-      reject(
-        err.code === "ENOENT" ? new Error(`"${spec.command}" was not found on your PATH.`) : err
-      );
-    });
-    if (spec.detached) {
-      child.unref();
-      setTimeout(() => {
-        if (settled) return;
-        settled = true;
-        resolve({ ok: true, detached: true });
+    let i = !1, r = "";
+    if ((a = s.stderr) == null || a.on("data", (c) => {
+      r = (r + c.toString()).slice(-2e3);
+    }), s.on("error", (c) => {
+      i || (i = !0, o(
+        c.code === "ENOENT" ? new Error(`"${e.command}" was not found on your PATH.`) : c
+      ));
+    }), e.detached) {
+      s.unref(), setTimeout(() => {
+        i || (i = !0, n({ ok: !0, detached: !0 }));
       }, 100);
       return;
     }
-    child.on("close", (code) => {
-      if (settled) return;
-      settled = true;
-      if (code === 0 || code === null) {
-        resolve({ ok: true, detached: false });
-      } else {
-        reject(new Error(`"${spec.command}" exited with code ${code}.`));
+    s.on("close", (c) => {
+      if (i) return;
+      if (i = !0, c === 0 || c === null) {
+        n({ ok: !0, detached: !1 });
+        return;
       }
+      const d = r.trim().split(/\r?\n/).filter(Boolean).slice(-2).join(" ");
+      o(new Error(d || `"${e.command}" exited with code ${c}.`));
     });
   });
 }
-function assertDirectory(projectPath) {
-  const absolutePath = path.resolve(projectPath);
-  if (!fs.existsSync(absolutePath)) {
-    throw new Error(`The folder "${absolutePath}" no longer exists.`);
-  }
-  return absolutePath;
+function Z(e) {
+  const t = p.resolve(e);
+  if (!h.existsSync(t))
+    throw new Error(`The folder "${t}" no longer exists.`);
+  return t;
 }
-async function openInEditor(editorKey, projectPath, newWindow = false) {
-  var _a;
-  const absolutePath = assertDirectory(projectPath);
-  const spec = editorSpec(editorKey, absolutePath, newWindow);
-  if (!spec) {
-    throw new Error(`Unknown editor "${editorKey}".`);
-  }
+async function me(e, t, n = !1) {
+  var i;
+  const o = Z(t), s = ut(e, o, n);
+  if (!s)
+    throw new Error(`Unknown editor "${e}".`);
   try {
-    return await run(spec, absolutePath);
-  } catch (e) {
-    const label = ((_a = EDITOR_BINARIES[editorKey]) == null ? void 0 : _a.label) ?? editorKey;
-    const message = e instanceof Error ? e.message : String(e);
-    if (message.includes("was not found on your PATH")) {
-      throw new Error(
-        `${label} was not detected. Make sure its command-line launcher is installed and on your PATH.`
-      );
-    }
-    throw new Error(`Could not open ${label}: ${message}`);
+    return await Y(s, o);
+  } catch (r) {
+    const a = ((i = F[e]) == null ? void 0 : i.label) ?? e, c = r instanceof Error ? r.message : String(r);
+    throw c.includes("was not found on your PATH") || c.includes("exited with code 9009") || /is not recognized as an internal or external command/i.test(c) || /command not found/i.test(c) ? new Error(
+      `${a} was not detected. Make sure its command-line launcher is installed and on your PATH.`
+    ) : new Error(`Could not open ${a}: ${c}`);
   }
 }
-async function openTerminal(projectPath) {
-  const absolutePath = assertDirectory(projectPath);
-  return run(terminalSpec(absolutePath), absolutePath);
+async function Te(e) {
+  const t = Z(e);
+  return Y(Pe(t), t);
 }
-async function openInExplorer(projectPath) {
-  const absolutePath = assertDirectory(projectPath);
-  return run(fileManagerSpec(absolutePath), absolutePath);
+async function Re(e) {
+  const t = Z(e);
+  return Y(dt(t), t);
 }
-async function runCommandInTerminal(commandString, cwd) {
-  const absolutePath = assertDirectory(cwd);
-  return run(terminalSpec(absolutePath, commandString), absolutePath);
+async function X(e, t) {
+  const n = Z(t);
+  return Y(Pe(n, e), n);
 }
-function getProjects() {
-  return readProjects();
+function Q() {
+  return ue("sessions");
 }
-function getProject(id) {
-  return readProjects().find((project) => project.id === id);
+function Me(e) {
+  K("sessions", e);
 }
-function addProject(projectData) {
-  const projects = readProjects();
-  const newProject = {
-    ...projectData,
-    id: projectData.id || generateId("proj"),
-    tags: projectData.tags || [],
-    commands: projectData.commands || [],
-    isFavorite: projectData.isFavorite ?? false,
-    createdAt: projectData.createdAt || Date.now(),
-    updatedAt: projectData.updatedAt || Date.now()
+const mt = 800, Ie = 6e4, _e = 30;
+function ft(e) {
+  return {
+    projectId: e,
+    steps: [],
+    capturedAt: Date.now(),
+    autoCapture: !0
   };
-  projects.push(newProject);
-  writeProjects(projects);
-  return newProject;
 }
-function updateProject(id, updates) {
-  const projects = readProjects();
-  const index = projects.findIndex((project) => project.id === id);
-  if (index === -1) return void 0;
-  const safeUpdates = { ...updates };
-  delete safeUpdates.id;
-  delete safeUpdates.createdAt;
-  const updatedProject = {
-    ...projects[index],
-    ...safeUpdates,
-    updatedAt: Date.now()
+function z(e) {
+  return Q().find((t) => t.projectId === e) ?? ft(e);
+}
+function ht() {
+  return Q();
+}
+function ee(e) {
+  const t = Q(), n = t.findIndex((s) => s.projectId === e.projectId), o = {
+    ...e,
+    steps: e.steps.slice(0, _e).map((s, i) => ({ ...s, sortOrder: i }))
   };
-  projects[index] = updatedProject;
-  writeProjects(projects);
-  return updatedProject;
+  return n === -1 ? t.push(o) : t[n] = o, Me(t), o;
 }
-function deleteProject(id) {
-  const projects = readProjects();
-  const filteredProjects = projects.filter((project) => project.id !== id);
-  if (filteredProjects.length === projects.length) return false;
-  writeProjects(filteredProjects);
-  return true;
-}
-function seedProjectCommands(projectId, commands) {
-  const project = requireProject(projectId);
-  if (project.commands && project.commands.length > 0) return project;
-  const now = Date.now();
-  const seeded = commands.map((cmd) => ({
-    ...cmd,
-    id: cmd.id || generateId("cmd"),
-    projectId,
-    isFavorite: cmd.isFavorite ?? false,
-    createdAt: cmd.createdAt || now,
-    updatedAt: now
-  }));
-  return updateProject(projectId, { commands: seeded });
-}
-function addProjectCommand(projectId, input) {
-  var _a, _b;
-  const project = requireProject(projectId);
-  const result = validateCommand(
-    { name: input.name, command: input.command, workingDirectory: input.workingDirectory },
-    project.path
+function ie(e, t, n, o) {
+  const s = z(e);
+  if (!s.autoCapture) return;
+  const i = s.steps.findIndex(
+    (r) => t === "editor" ? r.kind === "editor" : r.kind === t && r.target === n
   );
-  if (!result.valid) {
-    throw new Error(result.errors.join(" "));
+  if (i !== -1)
+    s.steps[i] = {
+      ...s.steps[i],
+      target: n,
+      label: o
+    };
+  else {
+    if (s.steps.length >= _e) return;
+    s.steps.push({
+      id: T("step"),
+      kind: t,
+      target: n,
+      label: o,
+      delayMs: mt,
+      enabled: !0,
+      sortOrder: s.steps.length
+    });
   }
-  const now = Date.now();
-  const command = {
-    id: generateId("cmd"),
-    projectId,
-    name: (input.name ?? "").trim(),
-    command: (input.command ?? "").trim(),
-    description: ((_a = input.description) == null ? void 0 : _a.trim()) || void 0,
-    workingDirectory: ((_b = input.workingDirectory) == null ? void 0 : _b.trim()) || void 0,
-    shell: input.shell,
-    isFavorite: input.isFavorite ?? false,
-    createdAt: now,
-    updatedAt: now
-  };
-  const commands = [...project.commands ?? [], command];
-  const updated = updateProject(projectId, { commands });
-  return { project: updated, command };
+  s.capturedAt = Date.now(), ee(s);
 }
-function updateProjectCommand(projectId, commandId, updates) {
-  const project = requireProject(projectId);
-  const commands = project.commands ?? [];
-  const index = commands.findIndex((c) => c.id === commandId);
-  if (index === -1) {
-    throw new Error("Command not found.");
-  }
-  const merged = {
-    ...commands[index],
-    ...updates,
-    id: commands[index].id,
-    projectId,
-    createdAt: commands[index].createdAt,
-    updatedAt: Date.now()
-  };
-  const touchesExecution = updates.name !== void 0 || updates.command !== void 0 || updates.workingDirectory !== void 0;
-  if (touchesExecution) {
-    const result = validateCommand(
-      { name: merged.name, command: merged.command, workingDirectory: merged.workingDirectory },
-      project.path
-    );
-    if (!result.valid) {
-      throw new Error(result.errors.join(" "));
-    }
-  }
-  const next = [...commands];
-  next[index] = merged;
-  const updated = updateProject(projectId, { commands: next });
-  return { project: updated, command: merged };
+function gt(e, t) {
+  const n = z(e);
+  return t.autoCapture !== void 0 && (n.autoCapture = t.autoCapture), t.steps && (n.steps = t.steps.map((o, s) => ({
+    id: o.id || T("step"),
+    kind: o.kind,
+    target: String(o.target ?? ""),
+    label: String(o.label ?? "").slice(0, 120),
+    delayMs: Math.min(Math.max(Number(o.delayMs) || 0, 0), Ie),
+    enabled: o.enabled !== !1,
+    sortOrder: s
+  }))), ee(n);
 }
-function deleteProjectCommand(projectId, commandId) {
-  const project = requireProject(projectId);
-  const commands = project.commands ?? [];
-  const next = commands.filter((c) => c.id !== commandId);
-  if (next.length === commands.length) {
-    throw new Error("Command not found.");
-  }
-  return updateProject(projectId, { commands: next });
+function wt(e) {
+  const t = z(e);
+  return t.steps = [], t.capturedAt = Date.now(), ee(t);
 }
-async function runProjectCommand(projectId, commandId, confirmedDestructive = false) {
-  const project = requireProject(projectId);
-  const command = (project.commands ?? []).find((c) => c.id === commandId);
-  if (!command) {
-    throw new Error("Command not found. It may have been deleted.");
-  }
-  if (!fs.existsSync(project.path)) {
-    throw new Error(`The folder "${project.path}" no longer exists.`);
-  }
-  const check = validateCommand(
-    { name: command.name, command: command.command, workingDirectory: command.workingDirectory },
-    project.path
-  );
-  if (!check.valid) {
-    throw new Error(check.errors.join(" "));
-  }
-  if (check.requiresConfirmation && !confirmedDestructive) {
+const yt = (e) => new Promise((t) => setTimeout(t, e));
+async function vt(e, t) {
+  const n = P().find((r) => r.id === e);
+  if (!n) throw new Error("Project not found.");
+  if (!h.existsSync(n.path))
+    throw new Error(`The folder "${n.path}" no longer exists.`);
+  const o = z(e), s = [...o.steps].sort((r, a) => r.sortOrder - a.sortOrder);
+  if (s.length === 0)
     throw new Error(
-      `"${command.name}" ${check.destructiveReason}. It was not run because it has not been confirmed.`
+      "This project has no saved session yet. Open it and run a command, then try again."
     );
+  const i = [];
+  for (let r = 0; r < s.length; r += 1) {
+    const a = s[r];
+    if (t == null || t({
+      projectId: e,
+      current: r + 1,
+      total: s.length,
+      label: a.label,
+      done: !1
+    }), !a.enabled) {
+      i.push({ stepId: a.id, label: a.label, kind: a.kind, status: "skipped" });
+      continue;
+    }
+    try {
+      await kt(n, a), i.push({ stepId: a.id, label: a.label, kind: a.kind, status: "ok" });
+    } catch (c) {
+      i.push({
+        stepId: a.id,
+        label: a.label,
+        kind: a.kind,
+        status: "failed",
+        error: c instanceof Error ? c.message : String(c)
+      });
+    }
+    a.delayMs > 0 && r < s.length - 1 && await yt(Math.min(a.delayMs, Ie));
   }
-  const cwd = resolveWorkingDirectory(project.path, command.workingDirectory);
-  const result = await runCommandInTerminal(command.command, cwd);
-  const now = Date.now();
-  const commands = (project.commands ?? []).map(
-    (c) => c.id === commandId ? { ...c, lastRunAt: now } : c
-  );
-  const updated = updateProject(projectId, { commands, lastCommandAt: now });
-  return { project: updated, result };
+  return t == null || t({
+    projectId: e,
+    current: s.length,
+    total: s.length,
+    label: "",
+    done: !0
+  }), o.lastResumedAt = Date.now(), ee(o), {
+    projectId: e,
+    projectName: n.name,
+    steps: i,
+    succeeded: i.filter((r) => r.status === "ok").length,
+    failed: i.filter((r) => r.status === "failed").length,
+    skipped: i.filter((r) => r.status === "skipped").length
+  };
 }
-const EDITOR_ACTIONS = {
+async function kt(e, t) {
+  switch (t.kind) {
+    case "editor": {
+      const n = F[t.target] ? t.target : "vscode";
+      await me(n, e.path, !1);
+      return;
+    }
+    case "terminal":
+      await Te(e.path);
+      return;
+    case "folder":
+      await Re(e.path);
+      return;
+    case "command": {
+      const n = (e.commands ?? []).find((i) => i.id === t.target);
+      if (!n)
+        throw new Error("That command has been deleted.");
+      const o = O(
+        {
+          name: n.name,
+          command: n.command,
+          workingDirectory: n.workingDirectory
+        },
+        e.path
+      );
+      if (!o.valid) throw new Error(o.errors.join(" "));
+      if (o.requiresConfirmation)
+        throw new Error(
+          `Skipped because it ${o.destructiveReason}. Run it manually if you meant to.`
+        );
+      const s = De(e.path, n.workingDirectory);
+      await X(n.command, s);
+      return;
+    }
+    case "url":
+      throw new Error("URL steps are not supported yet.");
+    default:
+      throw new Error(`Unknown step type "${t.kind}".`);
+  }
+}
+function bt() {
+  const e = new Set(P().map((o) => o.id)), t = Q(), n = t.filter((o) => e.has(o.projectId));
+  n.length !== t.length && Me(n);
+}
+function R() {
+  return P();
+}
+function ae(e) {
+  return P().find((t) => t.id === e);
+}
+function Oe(e) {
+  const t = P(), n = {
+    ...e,
+    id: e.id || T("proj"),
+    tags: e.tags || [],
+    commands: e.commands || [],
+    isFavorite: e.isFavorite ?? !1,
+    createdAt: e.createdAt || Date.now(),
+    updatedAt: e.updatedAt || Date.now()
+  };
+  return t.push(n), pe(t), n;
+}
+function M(e, t) {
+  const n = P(), o = n.findIndex((r) => r.id === e);
+  if (o === -1) return;
+  const s = { ...t };
+  delete s.id, delete s.createdAt;
+  const i = {
+    ...n[o],
+    ...s,
+    updatedAt: Date.now()
+  };
+  return n[o] = i, pe(n), i;
+}
+function St(e) {
+  const t = P(), n = t.filter((o) => o.id !== e);
+  return n.length === t.length ? !1 : (pe(n), !0);
+}
+function Et(e, t) {
+  const n = L(e);
+  if (n.commands && n.commands.length > 0) return n;
+  const o = Date.now(), s = t.map((i) => ({
+    ...i,
+    id: i.id || T("cmd"),
+    projectId: e,
+    isFavorite: i.isFavorite ?? !1,
+    createdAt: i.createdAt || o,
+    updatedAt: o
+  }));
+  return M(e, { commands: s });
+}
+function jt(e, t) {
+  var c, d;
+  const n = L(e), o = O(
+    { name: t.name, command: t.command, workingDirectory: t.workingDirectory },
+    n.path
+  );
+  if (!o.valid)
+    throw new Error(o.errors.join(" "));
+  const s = Date.now(), i = {
+    id: T("cmd"),
+    projectId: e,
+    name: (t.name ?? "").trim(),
+    command: (t.command ?? "").trim(),
+    description: ((c = t.description) == null ? void 0 : c.trim()) || void 0,
+    workingDirectory: ((d = t.workingDirectory) == null ? void 0 : d.trim()) || void 0,
+    shell: t.shell,
+    isFavorite: t.isFavorite ?? !1,
+    createdAt: s,
+    updatedAt: s
+  }, r = [...n.commands ?? [], i];
+  return { project: M(e, { commands: r }), command: i };
+}
+function Ct(e, t, n) {
+  const o = L(e), s = o.commands ?? [], i = s.findIndex((l) => l.id === t);
+  if (i === -1)
+    throw new Error("Command not found.");
+  const r = {
+    ...s[i],
+    ...n,
+    id: s[i].id,
+    projectId: e,
+    createdAt: s[i].createdAt,
+    updatedAt: Date.now()
+  };
+  if (n.name !== void 0 || n.command !== void 0 || n.workingDirectory !== void 0) {
+    const l = O(
+      { name: r.name, command: r.command, workingDirectory: r.workingDirectory },
+      o.path
+    );
+    if (!l.valid)
+      throw new Error(l.errors.join(" "));
+  }
+  const c = [...s];
+  return c[i] = r, { project: M(e, { commands: c }), command: r };
+}
+function At(e, t) {
+  const o = L(e).commands ?? [], s = o.filter((i) => i.id !== t);
+  if (s.length === o.length)
+    throw new Error("Command not found.");
+  return M(e, { commands: s });
+}
+async function xt(e, t, n = !1) {
+  const o = L(e), s = (o.commands ?? []).find((u) => u.id === t);
+  if (!s)
+    throw new Error("Command not found. It may have been deleted.");
+  if (!h.existsSync(o.path))
+    throw new Error(`The folder "${o.path}" no longer exists.`);
+  const i = O(
+    { name: s.name, command: s.command, workingDirectory: s.workingDirectory },
+    o.path
+  );
+  if (!i.valid)
+    throw new Error(i.errors.join(" "));
+  if (i.requiresConfirmation && !n)
+    throw new Error(
+      `"${s.name}" ${i.destructiveReason}. It was not run because it has not been confirmed.`
+    );
+  const r = De(o.path, s.workingDirectory), a = await X(s.command, r);
+  ie(e, "command", s.id, s.name);
+  const c = Date.now(), d = (o.commands ?? []).map(
+    (u) => u.id === t ? { ...u, lastRunAt: c } : u
+  );
+  return { project: M(e, { commands: d, lastCommandAt: c }), result: a };
+}
+const Nt = {
   "open-in-vscode": "vscode",
   vscode: "vscode",
   "open-in-cursor": "cursor",
@@ -460,780 +527,561 @@ const EDITOR_ACTIONS = {
   "open-in-antigravity": "antigravity",
   antigravity: "antigravity"
 };
-async function launchProject(id, action, newWindow = false) {
-  const project = requireProject(id);
-  const normalized = action.toLowerCase();
-  if (!fs.existsSync(project.path)) {
-    throw new Error(`The folder "${project.path}" no longer exists.`);
-  }
-  let result;
-  const editorKey = EDITOR_ACTIONS[normalized];
-  if (editorKey) {
-    result = await openInEditor(editorKey, project.path, newWindow);
-  } else if (normalized === "terminal" || normalized === "open-in-terminal") {
-    result = await openTerminal(project.path);
-  } else {
-    result = await openInExplorer(project.path);
-  }
-  const updated = updateProject(id, { lastOpenedAt: Date.now() });
-  return { project: updated, result };
+async function Dt(e, t, n = !1) {
+  var c;
+  const o = L(e), s = t.toLowerCase();
+  if (!h.existsSync(o.path))
+    throw new Error(`The folder "${o.path}" no longer exists.`);
+  let i;
+  const r = Nt[s];
+  return r ? (i = await me(r, o.path, n), ie(e, "editor", r, `Open in ${((c = F[r]) == null ? void 0 : c.label) ?? r}`)) : s === "terminal" || s === "open-in-terminal" ? (i = await Te(o.path), ie(e, "terminal", "", "Open terminal")) : i = await Re(o.path), { project: M(e, { lastOpenedAt: Date.now() }), result: i };
 }
-function requireProject(id) {
-  const project = getProject(id);
-  if (!project) {
+function L(e) {
+  const t = ae(e);
+  if (!t)
     throw new Error("Project not found.");
-  }
-  return project;
+  return t;
 }
-function fallbackCommand(folderPath) {
-  const has = (relative) => fs.existsSync(path$1.join(folderPath, relative));
-  if (has("Cargo.toml")) {
-    return { name: "Run", command: "cargo run", description: "Build and run the crate" };
-  }
-  if (has("go.mod")) {
-    return { name: "Run", command: "go run .", description: "Build and run the module" };
-  }
-  if (has("manage.py")) {
-    return {
-      name: "Start Dev Server",
-      command: "python manage.py runserver",
-      description: "Start the Django development server"
-    };
-  }
-  if (has("requirements.txt") || has("pyproject.toml") || has("Pipfile")) {
-    return { name: "Run", command: "python main.py", description: "Run the entry point" };
-  }
-  if (has("pom.xml")) {
-    return { name: "Run", command: "mvn spring-boot:run", description: "Run via Maven" };
-  }
-  if (has("build.gradle") || has("build.gradle.kts")) {
-    return { name: "Run", command: "gradle run", description: "Run via Gradle" };
-  }
-  if (has("docker-compose.yml") || has("docker-compose.yaml") || has("compose.yml")) {
-    return {
-      name: "Compose Up",
-      command: "docker compose up",
-      description: "Start the Compose stack"
-    };
-  }
-  if (has("Makefile")) {
-    return { name: "Make", command: "make", description: "Run the default make target" };
-  }
-  return null;
+function $t(e) {
+  const t = (n) => h.existsSync(W.join(e, n));
+  return t("Cargo.toml") ? { name: "Run", command: "cargo run", description: "Build and run the crate" } : t("go.mod") ? { name: "Run", command: "go run .", description: "Build and run the module" } : t("manage.py") ? {
+    name: "Start Dev Server",
+    command: "python manage.py runserver",
+    description: "Start the Django development server"
+  } : t("requirements.txt") || t("pyproject.toml") || t("Pipfile") ? { name: "Run", command: "python main.py", description: "Run the entry point" } : t("pom.xml") ? { name: "Run", command: "mvn spring-boot:run", description: "Run via Maven" } : t("build.gradle") || t("build.gradle.kts") ? { name: "Run", command: "gradle run", description: "Run via Gradle" } : t("docker-compose.yml") || t("docker-compose.yaml") || t("compose.yml") ? {
+    name: "Compose Up",
+    command: "docker compose up",
+    description: "Start the Compose stack"
+  } : t("Makefile") ? { name: "Make", command: "make", description: "Run the default make target" } : null;
 }
-function stableCommandId(folderPath, name, command) {
-  const digest = createHash("sha1").update(`${path$1.resolve(folderPath)}::${name}::${command}`).digest("hex").slice(0, 12);
-  return `cmd_${digest}`;
+function ve(e, t, n) {
+  return `cmd_${ot("sha1").update(`${W.resolve(e)}::${t}::${n}`).digest("hex").slice(0, 12)}`;
 }
-function detectProjectMeta(folderPath) {
-  const folderName = path$1.basename(folderPath) || "New Project";
-  const tagsSet = /* @__PURE__ */ new Set();
-  const languages = [];
-  const frameworks = [];
-  const commands = [];
-  let packageManager = void 0;
-  let description = void 0;
-  if (!folderPath || !fs.existsSync(folderPath)) {
+function Fe(e) {
+  const t = W.basename(e) || "New Project", n = /* @__PURE__ */ new Set(), o = [], s = [], i = [];
+  let r, a;
+  if (!e || !h.existsSync(e))
     return {
-      name: folderName,
+      name: t,
       tags: [],
       commands: [],
       details: {
         languages: [],
         frameworks: [],
-        hasGit: false,
-        hasDocker: false
+        hasGit: !1,
+        hasDocker: !1
       }
     };
-  }
-  const exists = (relativePath) => fs.existsSync(path$1.join(folderPath, relativePath));
-  const hasGit = exists(".git");
-  if (hasGit) tagsSet.add("Git");
-  const hasDocker = exists("Dockerfile") || exists("docker-compose.yml") || exists("docker-compose.yaml");
-  if (hasDocker) tagsSet.add("Docker");
-  let pmPrefix = "npm run";
-  if (exists("pnpm-lock.yaml")) {
-    packageManager = "pnpm";
-    pmPrefix = "pnpm";
-    tagsSet.add("pnpm");
-  } else if (exists("yarn.lock")) {
-    packageManager = "yarn";
-    pmPrefix = "yarn";
-    tagsSet.add("yarn");
-  } else if (exists("bun.lockb") || exists("bun.lock")) {
-    packageManager = "bun";
-    pmPrefix = "bun run";
-    tagsSet.add("bun");
-  } else if (exists("package-lock.json")) {
-    packageManager = "npm";
-    pmPrefix = "npm run";
-    tagsSet.add("npm");
-  }
-  const packageJsonPath = path$1.join(folderPath, "package.json");
-  if (fs.existsSync(packageJsonPath)) {
+  const c = (w) => h.existsSync(W.join(e, w)), d = c(".git");
+  d && n.add("Git");
+  const l = c("Dockerfile") || c("docker-compose.yml") || c("docker-compose.yaml");
+  l && n.add("Docker");
+  let u = "npm run";
+  c("pnpm-lock.yaml") ? (r = "pnpm", u = "pnpm", n.add("pnpm")) : c("yarn.lock") ? (r = "yarn", u = "yarn", n.add("yarn")) : c("bun.lockb") || c("bun.lock") ? (r = "bun", u = "bun run", n.add("bun")) : c("package-lock.json") && (r = "npm", u = "npm run", n.add("npm"));
+  const k = W.join(e, "package.json");
+  if (h.existsSync(k))
     try {
-      const content = JSON.parse(fs.readFileSync(packageJsonPath, "utf-8"));
-      if (content.description) {
-        description = content.description;
-      }
-      const allDeps = {
-        ...content.dependencies || {},
-        ...content.devDependencies || {}
+      const w = JSON.parse(h.readFileSync(k, "utf-8"));
+      w.description && (a = w.description);
+      const m = {
+        ...w.dependencies || {},
+        ...w.devDependencies || {}
       };
-      if (allDeps["typescript"] || exists("tsconfig.json")) {
-        languages.push("TypeScript");
-        tagsSet.add("TypeScript");
-      } else {
-        languages.push("JavaScript");
-        tagsSet.add("JavaScript");
-      }
-      if (allDeps["next"]) {
-        frameworks.push("Next.js");
-        tagsSet.add("Next.js");
-      } else if (allDeps["react"]) {
-        frameworks.push("React");
-        tagsSet.add("React");
-      } else if (allDeps["vue"]) {
-        frameworks.push("Vue");
-        tagsSet.add("Vue");
-      } else if (allDeps["@angular/core"]) {
-        frameworks.push("Angular");
-        tagsSet.add("Angular");
-      } else if (allDeps["svelte"]) {
-        frameworks.push("Svelte");
-        tagsSet.add("Svelte");
-      }
-      if (allDeps["vite"] || exists("vite.config.ts") || exists("vite.config.js")) {
-        frameworks.push("Vite");
-        tagsSet.add("Vite");
-      }
-      if (allDeps["express"]) {
-        frameworks.push("Express");
-        tagsSet.add("Express");
-      }
-      if (allDeps["electron"]) {
-        frameworks.push("Electron");
-        tagsSet.add("Electron");
-      }
-      if (!packageManager) {
-        packageManager = "npm";
-        tagsSet.add("npm");
-      }
-      if (content.scripts && typeof content.scripts === "object") {
-        const scripts = content.scripts;
-        const now = Date.now();
-        const addCommand = (name, command, description2, isFavorite) => {
-          commands.push({
-            id: stableCommandId(folderPath, name, command),
-            name,
-            command,
-            description: description2,
-            isFavorite,
-            createdAt: now,
-            updatedAt: now
+      if (m.typescript || c("tsconfig.json") ? (o.push("TypeScript"), n.add("TypeScript")) : (o.push("JavaScript"), n.add("JavaScript")), m.next ? (s.push("Next.js"), n.add("Next.js")) : m.react ? (s.push("React"), n.add("React")) : m.vue ? (s.push("Vue"), n.add("Vue")) : m["@angular/core"] ? (s.push("Angular"), n.add("Angular")) : m.svelte && (s.push("Svelte"), n.add("Svelte")), (m.vite || c("vite.config.ts") || c("vite.config.js")) && (s.push("Vite"), n.add("Vite")), m.express && (s.push("Express"), n.add("Express")), m.electron && (s.push("Electron"), n.add("Electron")), r || (r = "npm", n.add("npm")), w.scripts && typeof w.scripts == "object") {
+        const N = w.scripts, C = Date.now(), y = (b, H, te, ne) => {
+          i.push({
+            id: ve(e, b, H),
+            name: b,
+            command: H,
+            description: te,
+            isFavorite: ne,
+            createdAt: C,
+            updatedAt: C
           });
-        };
-        const known = [
-          ["dev", "Start Dev Server", "Launch local development server", true],
-          ["start", "Start Application", "Start application process", !scripts.dev],
-          ["build", "Build Production Bundle", "Compile production distribution assets", false],
-          ["test", "Run Test Suite", "Execute test scripts", false],
-          ["lint", "Lint & Format", "Run code linter", false],
-          ["typecheck", "Type Check", "Run the TypeScript compiler", false],
-          ["preview", "Preview Build", "Serve the production build locally", false]
+        }, E = [
+          ["dev", "Start Dev Server", "Launch local development server", !0],
+          ["start", "Start Application", "Start application process", !N.dev],
+          ["build", "Build Production Bundle", "Compile production distribution assets", !1],
+          ["test", "Run Test Suite", "Execute test scripts", !1],
+          ["lint", "Lint & Format", "Run code linter", !1],
+          ["typecheck", "Type Check", "Run the TypeScript compiler", !1],
+          ["preview", "Preview Build", "Serve the production build locally", !1]
         ];
-        for (const [script, label, description2, isFavorite] of known) {
-          if (scripts[script]) {
-            addCommand(label, `${pmPrefix} ${script}`, description2, isFavorite);
-          }
-        }
-        const claimed = new Set(known.map(([script]) => script));
-        for (const script of Object.keys(scripts)) {
-          if (claimed.has(script)) continue;
-          if (script.startsWith("pre") || script.startsWith("post")) continue;
-          addCommand(script, `${pmPrefix} ${script}`, `Run the "${script}" script`, false);
-        }
+        for (const [b, H, te, ne] of E)
+          N[b] && y(H, `${u} ${b}`, te, ne);
+        const A = new Set(E.map(([b]) => b));
+        for (const b of Object.keys(N))
+          A.has(b) || b.startsWith("pre") || b.startsWith("post") || y(b, `${u} ${b}`, `Run the "${b}" script`, !1);
       }
-    } catch (e) {
-      console.warn(`Could not parse package.json in ${folderPath}:`, e);
+    } catch (w) {
+      console.warn(`Could not parse package.json in ${e}:`, w);
     }
+  if (i.length === 0) {
+    const w = Date.now(), m = $t(e);
+    m && i.push({
+      id: ve(e, m.name, m.command),
+      ...m,
+      isFavorite: !0,
+      createdAt: w,
+      updatedAt: w
+    });
   }
-  if (commands.length === 0) {
-    const now = Date.now();
-    const fallback = fallbackCommand(folderPath);
-    if (fallback) {
-      commands.push({
-        id: stableCommandId(folderPath, fallback.name, fallback.command),
-        ...fallback,
-        isFavorite: true,
-        createdAt: now,
-        updatedAt: now
-      });
-    }
-  }
-  if (exists("requirements.txt") || exists("pyproject.toml") || exists("Pipfile")) {
-    languages.push("Python");
-    tagsSet.add("Python");
-  }
-  if (exists("go.mod")) {
-    languages.push("Go");
-    tagsSet.add("Go");
-  }
-  if (exists("Cargo.toml")) {
-    languages.push("Rust");
-    tagsSet.add("Rust");
-  }
-  if (exists("pom.xml") || exists("build.gradle")) {
-    languages.push("Java");
-    tagsSet.add("Java");
-  }
-  return {
-    name: folderName,
-    tags: Array.from(tagsSet),
-    description,
-    commands,
+  return (c("requirements.txt") || c("pyproject.toml") || c("Pipfile")) && (o.push("Python"), n.add("Python")), c("go.mod") && (o.push("Go"), n.add("Go")), c("Cargo.toml") && (o.push("Rust"), n.add("Rust")), (c("pom.xml") || c("build.gradle")) && (o.push("Java"), n.add("Java")), {
+    name: t,
+    tags: Array.from(n),
+    description: a,
+    commands: i,
     details: {
-      languages,
-      frameworks,
-      packageManager,
-      hasGit,
-      hasDocker
+      languages: o,
+      frameworks: s,
+      packageManager: r,
+      hasGit: d,
+      hasDocker: l
     }
   };
 }
-const MAX_STRING = 4096;
-function requireString(value, field) {
-  if (typeof value !== "string") {
-    throw new Error(`${field} must be a string.`);
-  }
-  const trimmed = value.trim();
-  if (!trimmed) {
-    throw new Error(`${field} is required.`);
-  }
-  if (trimmed.length > MAX_STRING) {
-    throw new Error(`${field} is too long.`);
-  }
-  if (trimmed.includes("\0")) {
-    throw new Error(`${field} contains invalid characters.`);
-  }
-  return trimmed;
+const Pt = 4096;
+function S(e, t) {
+  if (typeof e != "string")
+    throw new Error(`${t} must be a string.`);
+  const n = e.trim();
+  if (!n)
+    throw new Error(`${t} is required.`);
+  if (n.length > Pt)
+    throw new Error(`${t} is too long.`);
+  if (n.includes("\0"))
+    throw new Error(`${t} contains invalid characters.`);
+  return n;
 }
-function requireId(value, field) {
-  const id = requireString(value, field);
-  if (!/^[A-Za-z0-9_-]{1,64}$/.test(id)) {
-    throw new Error(`${field} is not a valid identifier.`);
-  }
-  return id;
+function v(e, t) {
+  const n = S(e, t);
+  if (!/^[A-Za-z0-9_-]{1,64}$/.test(n))
+    throw new Error(`${t} is not a valid identifier.`);
+  return n;
 }
-function requireObject(value, field) {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) {
-    throw new Error(`${field} must be an object.`);
-  }
-  return value;
+function D(e, t) {
+  if (typeof e != "object" || e === null || Array.isArray(e))
+    throw new Error(`${t} must be an object.`);
+  return e;
 }
-function optionalBoolean(value, field) {
-  if (value === void 0 || value === null) return false;
-  if (typeof value !== "boolean") {
-    throw new Error(`${field} must be a boolean.`);
-  }
-  return value;
+function J(e, t) {
+  if (e == null) return !1;
+  if (typeof e != "boolean")
+    throw new Error(`${t} must be a boolean.`);
+  return e;
 }
-function handler(name, fn) {
-  return async (_event, ...args) => {
+function g(e, t) {
+  return async (n, ...o) => {
     try {
-      return await fn(...args);
-    } catch (e) {
-      const message = e instanceof Error ? e.message : String(e);
-      console.error(`IPC ${name} failed:`, message);
-      throw new Error(message);
+      return await t(...o);
+    } catch (s) {
+      const i = s instanceof Error ? s.message : String(s);
+      throw console.error(`IPC ${e} failed:`, i), new Error(i);
     }
   };
 }
-function withStatus(project) {
-  return { ...project, pathExists: Boolean(project.path) && fs.existsSync(project.path) };
+function x(e) {
+  return { ...e, pathExists: !!e.path && h.existsSync(e.path) };
 }
-function registerProjectIPC() {
-  ipcMain.handle(
+function Tt() {
+  f.handle(
     "projects:getAll",
-    handler("projects:getAll", () => getProjects().map(withStatus))
-  );
-  ipcMain.handle(
+    g("projects:getAll", () => R().map(x))
+  ), f.handle(
     "projects:get",
-    handler("projects:get", (id) => {
-      const project = getProject(requireId(id, "Project id"));
-      return project ? withStatus(project) : void 0;
+    g("projects:get", (e) => {
+      const t = ae(v(e, "Project id"));
+      return t ? x(t) : void 0;
     })
-  );
-  ipcMain.handle(
+  ), f.handle(
     "projects:add",
-    handler("projects:add", (project) => {
-      const input = requireObject(project, "Project");
-      const name = requireString(input.name, "Project name");
-      const projectPath = requireString(input.path, "Project path");
-      if (!fs.existsSync(projectPath)) {
-        throw new Error(`The folder "${projectPath}" does not exist.`);
-      }
-      if (!fs.statSync(projectPath).isDirectory()) {
-        throw new Error(`"${projectPath}" is a file, not a folder.`);
-      }
-      return withStatus(
-        addProject({
-          ...input,
-          name,
-          path: projectPath,
-          tags: Array.isArray(input.tags) ? input.tags : [],
-          isFavorite: Boolean(input.isFavorite)
+    g("projects:add", (e) => {
+      const t = D(e, "Project"), n = S(t.name, "Project name"), o = S(t.path, "Project path");
+      if (!h.existsSync(o))
+        throw new Error(`The folder "${o}" does not exist.`);
+      if (!h.statSync(o).isDirectory())
+        throw new Error(`"${o}" is a file, not a folder.`);
+      return x(
+        Oe({
+          ...t,
+          name: n,
+          path: o,
+          tags: Array.isArray(t.tags) ? t.tags : [],
+          isFavorite: !!t.isFavorite
         })
       );
     })
-  );
-  ipcMain.handle(
+  ), f.handle(
     "projects:update",
-    handler("projects:update", (id, updates) => {
-      const projectId = requireId(id, "Project id");
-      const patch = requireObject(updates, "Updates");
-      if (patch.path !== void 0) {
-        const nextPath = requireString(patch.path, "Project path");
-        if (!fs.existsSync(nextPath)) {
-          throw new Error(`The folder "${nextPath}" does not exist.`);
-        }
+    g("projects:update", (e, t) => {
+      const n = v(e, "Project id"), o = D(t, "Updates");
+      if (o.path !== void 0) {
+        const i = S(o.path, "Project path");
+        if (!h.existsSync(i))
+          throw new Error(`The folder "${i}" does not exist.`);
       }
-      if (patch.name !== void 0) {
-        requireString(patch.name, "Project name");
-      }
-      const updated = updateProject(projectId, patch);
-      if (!updated) throw new Error("Project not found.");
-      return withStatus(updated);
+      o.name !== void 0 && S(o.name, "Project name");
+      const s = M(n, o);
+      if (!s) throw new Error("Project not found.");
+      return x(s);
     })
-  );
-  ipcMain.handle(
+  ), f.handle(
     "projects:delete",
-    handler("projects:delete", (id) => deleteProject(requireId(id, "Project id")))
-  );
-  ipcMain.handle(
+    g("projects:delete", (e) => St(v(e, "Project id")))
+  ), f.handle(
     "projects:detect",
-    handler(
+    g(
       "projects:detect",
-      (folderPath) => detectProjectMeta(requireString(folderPath, "Folder path"))
+      (e) => Fe(S(e, "Folder path"))
     )
-  );
-  ipcMain.handle(
+  ), f.handle(
     "projects:seedCommands",
-    handler("projects:seedCommands", (projectId, commands) => {
-      if (!Array.isArray(commands)) throw new Error("Commands must be an array.");
-      return withStatus(
-        seedProjectCommands(requireId(projectId, "Project id"), commands)
+    g("projects:seedCommands", (e, t) => {
+      if (!Array.isArray(t)) throw new Error("Commands must be an array.");
+      return x(
+        Et(v(e, "Project id"), t)
       );
     })
-  );
-  ipcMain.handle(
+  ), f.handle(
     "projects:addCommand",
-    handler("projects:addCommand", (projectId, command) => {
-      const input = requireObject(command, "Command");
-      const { project, command: created } = addProjectCommand(
-        requireId(projectId, "Project id"),
-        input
+    g("projects:addCommand", (e, t) => {
+      const n = D(t, "Command"), { project: o, command: s } = jt(
+        v(e, "Project id"),
+        n
       );
-      return { project: withStatus(project), command: created };
+      return { project: x(o), command: s };
     })
-  );
-  ipcMain.handle(
+  ), f.handle(
     "projects:updateCommand",
-    handler("projects:updateCommand", (projectId, commandId, updates) => {
-      const patch = requireObject(updates, "Updates");
-      const { project, command } = updateProjectCommand(
-        requireId(projectId, "Project id"),
-        requireId(commandId, "Command id"),
-        patch
+    g("projects:updateCommand", (e, t, n) => {
+      const o = D(n, "Updates"), { project: s, command: i } = Ct(
+        v(e, "Project id"),
+        v(t, "Command id"),
+        o
       );
-      return { project: withStatus(project), command };
+      return { project: x(s), command: i };
     })
-  );
-  ipcMain.handle(
+  ), f.handle(
     "projects:deleteCommand",
-    handler(
+    g(
       "projects:deleteCommand",
-      (projectId, commandId) => withStatus(
-        deleteProjectCommand(
-          requireId(projectId, "Project id"),
-          requireId(commandId, "Command id")
+      (e, t) => x(
+        At(
+          v(e, "Project id"),
+          v(t, "Command id")
         )
       )
     )
-  );
-  ipcMain.handle(
+  ), f.handle(
     "projects:runCommand",
-    handler("projects:runCommand", async (projectId, commandId, confirmed) => {
-      const { project } = await runProjectCommand(
-        requireId(projectId, "Project id"),
-        requireId(commandId, "Command id"),
-        optionalBoolean(confirmed, "Confirmation flag")
+    g("projects:runCommand", async (e, t, n) => {
+      const { project: o } = await xt(
+        v(e, "Project id"),
+        v(t, "Command id"),
+        J(n, "Confirmation flag")
       );
-      return withStatus(project);
+      return x(o);
     })
-  );
-  ipcMain.handle(
+  ), f.handle(
     "projects:inspectCommand",
-    handler("projects:inspectCommand", (projectId, commandId) => {
-      const project = getProject(requireId(projectId, "Project id"));
-      if (!project) throw new Error("Project not found.");
-      const command = (project.commands ?? []).find(
-        (c) => c.id === requireId(commandId, "Command id")
+    g("projects:inspectCommand", (e, t) => {
+      const n = ae(v(e, "Project id"));
+      if (!n) throw new Error("Project not found.");
+      const o = (n.commands ?? []).find(
+        (s) => s.id === v(t, "Command id")
       );
-      if (!command) throw new Error("Command not found.");
-      return validateCommand(
+      if (!o) throw new Error("Command not found.");
+      return O(
         {
-          name: command.name,
-          command: command.command,
-          workingDirectory: command.workingDirectory
+          name: o.name,
+          command: o.command,
+          workingDirectory: o.workingDirectory
         },
-        project.path
+        n.path
       );
     })
-  );
-  ipcMain.handle(
+  ), f.handle(
     "projects:validateCommand",
-    handler("projects:validateCommand", (draft, projectPath) => {
-      const input = requireObject(draft, "Command");
-      return validateCommand(
+    g("projects:validateCommand", (e, t) => {
+      const n = D(e, "Command");
+      return O(
         {
-          name: typeof input.name === "string" ? input.name : "",
-          command: typeof input.command === "string" ? input.command : "",
-          workingDirectory: typeof input.workingDirectory === "string" ? input.workingDirectory : void 0
+          name: typeof n.name == "string" ? n.name : "",
+          command: typeof n.command == "string" ? n.command : "",
+          workingDirectory: typeof n.workingDirectory == "string" ? n.workingDirectory : void 0
         },
-        typeof projectPath === "string" ? projectPath : void 0
+        typeof t == "string" ? t : void 0
       );
     })
-  );
-  ipcMain.handle(
+  ), f.handle(
     "projects:launch",
-    handler("projects:launch", async (id, action, newWindow) => {
-      const { project } = await launchProject(
-        requireId(id, "Project id"),
-        requireString(action, "Action"),
-        optionalBoolean(newWindow, "New window flag")
+    g("projects:launch", async (e, t, n) => {
+      const { project: o } = await Dt(
+        v(e, "Project id"),
+        S(t, "Action"),
+        J(n, "New window flag")
       );
-      return withStatus(project);
+      return x(o);
     })
   );
 }
-function readGroups() {
-  const data = readData("groups");
-  if (data.length === 0) {
-    const defaultGroups = [
+function V() {
+  const e = ue("groups");
+  if (e.length === 0) {
+    const t = [
       { id: "group_freelance", name: "Freelance", sortOrder: 1, createdAt: Date.now(), updatedAt: Date.now() },
       { id: "group_personal", name: "Personal", sortOrder: 2, createdAt: Date.now(), updatedAt: Date.now() },
       { id: "group_experiments", name: "Experiments", sortOrder: 3, createdAt: Date.now(), updatedAt: Date.now() },
       { id: "group_learning", name: "Learning", sortOrder: 4, createdAt: Date.now(), updatedAt: Date.now() }
     ];
-    writeData("groups", defaultGroups);
-    return defaultGroups;
+    return K("groups", t), t;
   }
-  return data;
+  return e;
 }
-function writeGroups(groups) {
-  writeData("groups", groups);
+function fe(e) {
+  K("groups", e);
 }
-function getGroups() {
-  return readGroups();
+function Rt() {
+  return V();
 }
-function getGroup(id) {
-  const groups = readGroups();
-  return groups.find((group) => group.id === id);
+function Mt(e) {
+  return V().find((n) => n.id === e);
 }
-function addGroup(groupData) {
-  const groups = readGroups();
-  const newGroup = {
-    id: groupData.id || generateId("group"),
-    name: groupData.name,
-    icon: groupData.icon,
-    color: groupData.color,
-    sortOrder: groupData.sortOrder ?? groups.length + 1,
-    createdAt: groupData.createdAt || Date.now(),
-    updatedAt: groupData.updatedAt || Date.now()
+function It(e) {
+  const t = V(), n = {
+    id: e.id || T("group"),
+    name: e.name,
+    icon: e.icon,
+    color: e.color,
+    sortOrder: e.sortOrder ?? t.length + 1,
+    createdAt: e.createdAt || Date.now(),
+    updatedAt: e.updatedAt || Date.now()
   };
-  groups.push(newGroup);
-  writeGroups(groups);
-  return newGroup;
+  return t.push(n), fe(t), n;
 }
-function updateGroup(id, updates) {
-  const groups = readGroups();
-  const index = groups.findIndex((g) => g.id === id);
-  if (index === -1) {
-    return void 0;
-  }
-  const updatedGroup = {
-    ...groups[index],
-    ...updates,
+function _t(e, t) {
+  const n = V(), o = n.findIndex((i) => i.id === e);
+  if (o === -1)
+    return;
+  const s = {
+    ...n[o],
+    ...t,
     updatedAt: Date.now()
   };
-  groups[index] = updatedGroup;
-  writeGroups(groups);
-  return updatedGroup;
+  return n[o] = s, fe(n), s;
 }
-function deleteGroup(id) {
-  const groups = readGroups();
-  const filtered = groups.filter((g) => g.id !== id);
-  if (filtered.length === groups.length) {
-    return false;
-  }
-  writeGroups(filtered);
-  return true;
+function Ot(e) {
+  const t = V(), n = t.filter((o) => o.id !== e);
+  return n.length === t.length ? !1 : (fe(n), !0);
 }
-function registerGroupIPC() {
-  ipcMain.handle("groups:getAll", () => {
-    return getGroups();
-  });
-  ipcMain.handle("groups:get", (_, id) => {
-    return getGroup(id);
-  });
-  ipcMain.handle("groups:add", (_, groupData) => {
-    return addGroup(groupData);
-  });
-  ipcMain.handle("groups:update", (_, id, updates) => {
-    return updateGroup(id, updates);
-  });
-  ipcMain.handle("groups:delete", (_, id) => {
-    return deleteGroup(id);
-  });
+function Ft() {
+  f.handle("groups:getAll", () => Rt()), f.handle("groups:get", (e, t) => Mt(t)), f.handle("groups:add", (e, t) => It(t)), f.handle("groups:update", (e, t, n) => _t(t, n)), f.handle("groups:delete", (e, t) => Ot(t));
 }
-function registerDialogIPC() {
-  ipcMain.handle(
+function Lt() {
+  f.handle(
     "dialog:selectFolder",
-    handler("dialog:selectFolder", async (defaultPath) => {
-      const parent = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0];
-      const options = {
+    g("dialog:selectFolder", async (e) => {
+      const t = _.getFocusedWindow() ?? _.getAllWindows()[0], n = {
         title: "Select project folder",
         properties: ["openDirectory", "createDirectory"]
       };
-      if (typeof defaultPath === "string" && defaultPath && fs.existsSync(defaultPath)) {
-        options.defaultPath = defaultPath;
-      }
-      const result = parent ? await dialog.showOpenDialog(parent, options) : await dialog.showOpenDialog(options);
-      if (result.canceled || result.filePaths.length === 0) return null;
-      const selected = result.filePaths[0];
-      return { path: selected, name: path.basename(selected) };
+      typeof e == "string" && e && h.existsSync(e) && (n.defaultPath = e);
+      const o = t ? await ge.showOpenDialog(t, n) : await ge.showOpenDialog(n);
+      if (o.canceled || o.filePaths.length === 0) return null;
+      const s = o.filePaths[0];
+      return { path: s, name: p.basename(s) };
     })
-  );
-  ipcMain.handle(
+  ), f.handle(
     "dialog:pathExists",
-    handler("dialog:pathExists", (target) => {
-      const candidate = requireString(target, "Path");
-      return fs.existsSync(candidate) && fs.statSync(candidate).isDirectory();
+    g("dialog:pathExists", (e) => {
+      const t = S(e, "Path");
+      return h.existsSync(t) && h.statSync(t).isDirectory();
     })
-  );
-  ipcMain.handle(
+  ), f.handle(
     "shell:openExternal",
-    handler("shell:openExternal", async (url) => {
-      const target = requireString(url, "URL");
-      let parsed;
+    g("shell:openExternal", async (e) => {
+      const t = S(e, "URL");
+      let n;
       try {
-        parsed = new URL(target);
+        n = new URL(t);
       } catch {
         throw new Error("That is not a valid URL.");
       }
-      if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      if (n.protocol !== "http:" && n.protocol !== "https:")
         throw new Error("Only http and https links can be opened.");
-      }
-      await shell.openExternal(parsed.toString());
-      return true;
+      return await re.openExternal(n.toString()), !0;
     })
   );
 }
-async function measureDirectory(target) {
-  const stats = { sizeBytes: 0, fileCount: 0, lastModified: 0 };
-  const stack = [target];
-  while (stack.length > 0) {
-    const current = stack.pop();
-    let entries;
+async function Le(e) {
+  const t = { sizeBytes: 0, fileCount: 0, lastModified: 0 }, n = [e];
+  for (; n.length > 0; ) {
+    const o = n.pop();
+    let s;
     try {
-      entries = await promises.readdir(current, { withFileTypes: true });
+      s = await j.readdir(o, { withFileTypes: !0 });
     } catch {
       continue;
     }
-    for (const entry of entries) {
-      const full = path.join(current, entry.name);
-      if (entry.isSymbolicLink()) {
-        stats.fileCount += 1;
+    for (const i of s) {
+      const r = p.join(o, i.name);
+      if (i.isSymbolicLink()) {
+        t.fileCount += 1;
         continue;
       }
-      if (entry.isDirectory()) {
-        stack.push(full);
+      if (i.isDirectory()) {
+        n.push(r);
         continue;
       }
       try {
-        const info = await promises.stat(full);
-        stats.sizeBytes += info.size;
-        stats.fileCount += 1;
-        if (info.mtimeMs > stats.lastModified) stats.lastModified = info.mtimeMs;
+        const a = await j.stat(r);
+        t.sizeBytes += a.size, t.fileCount += 1, a.mtimeMs > t.lastModified && (t.lastModified = a.mtimeMs);
       } catch {
       }
     }
   }
-  return stats;
+  return t;
 }
-async function findNodeModules(root, maxDepth = 3) {
-  const found = [];
-  const queue = [{ dir: root, depth: 0 }];
-  const IGNORED = /* @__PURE__ */ new Set([".git", ".next", "dist", "build", "out", ".cache", ".turbo"]);
-  while (queue.length > 0) {
-    const { dir, depth } = queue.shift();
-    let entries;
+async function Ut(e, t = 3) {
+  const n = [], o = [{ dir: e, depth: 0 }], s = /* @__PURE__ */ new Set([".git", ".next", "dist", "build", "out", ".cache", ".turbo"]);
+  for (; o.length > 0; ) {
+    const { dir: i, depth: r } = o.shift();
+    let a;
     try {
-      entries = await promises.readdir(dir, { withFileTypes: true });
+      a = await j.readdir(i, { withFileTypes: !0 });
     } catch {
       continue;
     }
-    for (const entry of entries) {
-      if (!entry.isDirectory() || entry.isSymbolicLink()) continue;
-      if (entry.name === "node_modules") {
-        found.push(path.join(dir, entry.name));
-        continue;
+    for (const c of a)
+      if (!(!c.isDirectory() || c.isSymbolicLink())) {
+        if (c.name === "node_modules") {
+          n.push(p.join(i, c.name));
+          continue;
+        }
+        r < t && !s.has(c.name) && !c.name.startsWith(".") && o.push({ dir: p.join(i, c.name), depth: r + 1 });
       }
-      if (depth < maxDepth && !IGNORED.has(entry.name) && !entry.name.startsWith(".")) {
-        queue.push({ dir: path.join(dir, entry.name), depth: depth + 1 });
-      }
-    }
   }
-  return found;
+  return n;
 }
-const STALE_AFTER_DAYS = 30;
-const DAY_MS = 24 * 60 * 60 * 1e3;
-async function scanNodeModules(onProgress) {
-  const projects = getProjects();
-  const entries = [];
-  const warnings = [];
-  let scannedProjects = 0;
-  let skippedProjects = 0;
-  for (let i = 0; i < projects.length; i += 1) {
-    const project = projects[i];
-    onProgress == null ? void 0 : onProgress({
-      current: i + 1,
-      total: projects.length,
-      projectName: project.name,
-      done: false
-    });
-    if (!project.path || !fs.existsSync(project.path)) {
-      skippedProjects += 1;
+const ke = 30, be = 24 * 60 * 60 * 1e3;
+async function Wt(e) {
+  const t = R(), n = [], o = [];
+  let s = 0, i = 0;
+  for (let r = 0; r < t.length; r += 1) {
+    const a = t[r];
+    if (e == null || e({
+      current: r + 1,
+      total: t.length,
+      projectName: a.name,
+      done: !1
+    }), !a.path || !h.existsSync(a.path)) {
+      i += 1;
       continue;
     }
-    let modulePaths;
+    let c;
     try {
-      modulePaths = await findNodeModules(project.path);
-    } catch (e) {
-      warnings.push(`Could not scan ${project.name}: ${e.message}`);
-      skippedProjects += 1;
+      c = await Ut(a.path);
+    } catch (d) {
+      o.push(`Could not scan ${a.name}: ${d.message}`), i += 1;
       continue;
     }
-    scannedProjects += 1;
-    for (const modulesPath of modulePaths) {
-      const stats = await measureDirectory(modulesPath);
-      const daysSinceOpened = project.lastOpenedAt ? Math.floor((Date.now() - project.lastOpenedAt) / DAY_MS) : null;
-      const daysSinceModified = stats.lastModified ? Math.floor((Date.now() - stats.lastModified) / DAY_MS) : null;
-      const isStale = daysSinceOpened === null ? (daysSinceModified ?? 0) >= STALE_AFTER_DAYS : daysSinceOpened >= STALE_AFTER_DAYS;
-      const relative = path.relative(project.path, modulesPath);
-      entries.push({
-        projectId: project.id,
-        projectName: project.name,
-        projectPath: project.path,
-        modulesPath,
-        relativeLabel: relative || "node_modules",
-        sizeBytes: stats.sizeBytes,
-        fileCount: stats.fileCount,
-        lastModified: stats.lastModified,
-        lastOpenedAt: project.lastOpenedAt,
-        daysSinceOpened,
-        isStale
+    s += 1;
+    for (const d of c) {
+      const l = await Le(d), u = a.lastOpenedAt ? Math.floor((Date.now() - a.lastOpenedAt) / be) : null, k = l.lastModified ? Math.floor((Date.now() - l.lastModified) / be) : null, w = u === null ? (k ?? 0) >= ke : u >= ke, m = p.relative(a.path, d);
+      n.push({
+        projectId: a.id,
+        projectName: a.name,
+        projectPath: a.path,
+        modulesPath: d,
+        relativeLabel: m || "node_modules",
+        sizeBytes: l.sizeBytes,
+        fileCount: l.fileCount,
+        lastModified: l.lastModified,
+        lastOpenedAt: a.lastOpenedAt,
+        daysSinceOpened: u,
+        isStale: w
       });
     }
   }
-  onProgress == null ? void 0 : onProgress({
-    current: projects.length,
-    total: projects.length,
+  return e == null || e({
+    current: t.length,
+    total: t.length,
     projectName: "",
-    done: true
-  });
-  entries.sort((a, b) => b.sizeBytes - a.sizeBytes);
-  return {
-    entries,
-    totalBytes: entries.reduce((sum, e) => sum + e.sizeBytes, 0),
-    staleBytes: entries.filter((e) => e.isStale).reduce((sum, e) => sum + e.sizeBytes, 0),
-    scannedProjects,
-    skippedProjects,
-    warnings
+    done: !0
+  }), n.sort((r, a) => a.sizeBytes - r.sizeBytes), {
+    entries: n,
+    totalBytes: n.reduce((r, a) => r + a.sizeBytes, 0),
+    staleBytes: n.filter((r) => r.isStale).reduce((r, a) => r + a.sizeBytes, 0),
+    scannedProjects: s,
+    skippedProjects: i,
+    warnings: o
   };
 }
-async function deleteNodeModules(targets) {
-  const projects = getProjects();
-  const projectRoots = projects.filter((p) => p.path).map((p) => path.resolve(p.path));
-  const result = { deleted: [], failed: [], reclaimedBytes: 0 };
-  for (const rawTarget of targets) {
-    const target = path.resolve(rawTarget);
-    const reject = (reason) => result.failed.push({ path: rawTarget, reason });
-    if (path.basename(target) !== "node_modules") {
-      reject("Not a node_modules directory.");
+async function Bt(e) {
+  const n = R().filter((s) => s.path).map((s) => p.resolve(s.path)), o = { deleted: [], failed: [], reclaimedBytes: 0 };
+  for (const s of e) {
+    const i = p.resolve(s), r = (l) => o.failed.push({ path: s, reason: l });
+    if (p.basename(i) !== "node_modules") {
+      r("Not a node_modules directory.");
       continue;
     }
-    const owningRoot = projectRoots.find(
-      (root) => target.startsWith(root + path.sep) && target !== root
-    );
-    if (!owningRoot) {
-      reject("Not inside a registered project folder.");
+    if (!n.find(
+      (l) => i.startsWith(l + p.sep) && i !== l
+    )) {
+      r("Not inside a registered project folder.");
       continue;
     }
-    let stat;
+    let c;
     try {
-      stat = await promises.lstat(target);
+      c = await j.lstat(i);
     } catch {
-      reject("Folder no longer exists.");
+      r("Folder no longer exists.");
       continue;
     }
-    if (stat.isSymbolicLink()) {
-      reject("Refusing to follow a symlink.");
+    if (c.isSymbolicLink()) {
+      r("Refusing to follow a symlink.");
       continue;
     }
-    if (!stat.isDirectory()) {
-      reject("Not a directory.");
+    if (!c.isDirectory()) {
+      r("Not a directory.");
       continue;
     }
-    const { sizeBytes } = await measureDirectory(target);
+    const { sizeBytes: d } = await Le(i);
     try {
-      await promises.rm(target, { recursive: true, force: true, maxRetries: 3, retryDelay: 200 });
-      result.deleted.push(target);
-      result.reclaimedBytes += sizeBytes;
-    } catch (e) {
-      const message = e.code === "EBUSY" ? "Files are in use. Close your editor or dev server and try again." : e.message;
-      reject(message);
+      await j.rm(i, { recursive: !0, force: !0, maxRetries: 3, retryDelay: 200 }), o.deleted.push(i), o.reclaimedBytes += d;
+    } catch (l) {
+      const u = l.code === "EBUSY" ? "Files are in use. Close your editor or dev server and try again." : l.message;
+      r(u);
     }
   }
-  return result;
+  return o;
 }
-function capture(command, args, timeoutMs = 1e4) {
-  return new Promise((resolve, reject) => {
-    execFile(
-      command,
-      args,
-      { timeout: timeoutMs, windowsHide: true, maxBuffer: 8 * 1024 * 1024 },
-      (error, stdout, stderr) => {
-        if (error) {
-          const err = error;
-          if (err.code === "ENOENT") {
-            reject(new Error(`"${command}" is not available on this system.`));
+function $(e, t, n = 1e4) {
+  return new Promise((o, s) => {
+    st(
+      e,
+      t,
+      { timeout: n, windowsHide: !0, maxBuffer: 8 * 1024 * 1024 },
+      (i, r, a) => {
+        if (i) {
+          const c = i;
+          if (c.code === "ENOENT") {
+            s(new Error(`"${e}" is not available on this system.`));
             return;
           }
-          resolve({
-            stdout: stdout ?? "",
-            stderr: stderr ?? "",
-            code: typeof err.code === "number" ? err.code : 1
+          o({
+            stdout: r ?? "",
+            stderr: a ?? "",
+            code: typeof c.code == "number" ? c.code : 1
           });
           return;
         }
-        resolve({ stdout, stderr, code: 0 });
+        o({ stdout: r, stderr: a, code: 0 });
       }
     );
   });
 }
-const KNOWN_SERVICES = {
+const Gt = {
   80: "HTTP",
   443: "HTTPS",
   3e3: "Node / Next.js",
@@ -1255,138 +1103,115 @@ const KNOWN_SERVICES = {
   5672: "RabbitMQ",
   9200: "Elasticsearch",
   11434: "Ollama"
-};
-const PROTECTED_PIDS = /* @__PURE__ */ new Set([0, 4]);
-function classifyPort(port) {
-  const knownService = KNOWN_SERVICES[port];
-  const isDevPort = Boolean(knownService) || port >= 3e3 && port <= 9999 || port >= 4e3 && port <= 5999;
-  return { isDevPort, knownService };
+}, he = /* @__PURE__ */ new Set([0, 4]);
+function Ue(e) {
+  const t = Gt[e];
+  return { isDevPort: !!t || e >= 3e3 && e <= 9999 || e >= 4e3 && e <= 5999, knownService: t };
 }
-async function listPorts() {
-  const warnings = [];
-  const entries = isWindows ? await listPortsWindows(warnings) : await listPortsUnix(warnings);
-  const byPort = /* @__PURE__ */ new Map();
-  for (const entry of entries) {
-    const key = `${entry.port}:${entry.pid}`;
-    if (!byPort.has(key)) byPort.set(key, entry);
+async function We() {
+  const e = [], t = G ? await zt(e) : await Ht(e), n = /* @__PURE__ */ new Map();
+  for (const s of t) {
+    const i = `${s.port}:${s.pid}`;
+    n.has(i) || n.set(i, s);
   }
-  const deduped = [...byPort.values()].sort((a, b) => a.port - b.port);
-  return { entries: deduped, scannedAt: Date.now(), warnings };
+  return { entries: [...n.values()].sort((s, i) => s.port - i.port), scannedAt: Date.now(), warnings: e };
 }
-async function listPortsWindows(warnings) {
-  const { stdout } = await capture("netstat", ["-ano", "-p", "TCP"]);
-  const entries = [];
-  for (const line of stdout.split(/\r?\n/)) {
-    const parts = line.trim().split(/\s+/);
-    if (parts.length < 5 || parts[0].toUpperCase() !== "TCP") continue;
-    if (parts[3].toUpperCase() !== "LISTENING") continue;
-    const local = parts[1];
-    const pid = Number(parts[4]);
-    if (!Number.isFinite(pid)) continue;
-    const separator = local.lastIndexOf(":");
-    if (separator === -1) continue;
-    const port = Number(local.slice(separator + 1));
-    if (!Number.isFinite(port) || port === 0) continue;
-    const { isDevPort, knownService } = classifyPort(port);
-    entries.push({
-      port,
-      pid,
+async function zt(e) {
+  const { stdout: t } = await $("netstat", ["-ano", "-p", "TCP"]), n = [];
+  for (const o of t.split(/\r?\n/)) {
+    const s = o.trim().split(/\s+/);
+    if (s.length < 5 || s[0].toUpperCase() !== "TCP" || s[3].toUpperCase() !== "LISTENING") continue;
+    const i = s[1], r = Number(s[4]);
+    if (!Number.isFinite(r)) continue;
+    const a = i.lastIndexOf(":");
+    if (a === -1) continue;
+    const c = Number(i.slice(a + 1));
+    if (!Number.isFinite(c) || c === 0) continue;
+    const { isDevPort: d, knownService: l } = Ue(c);
+    n.push({
+      port: c,
+      pid: r,
       protocol: "TCP",
-      address: local.slice(0, separator) || "0.0.0.0",
+      address: i.slice(0, a) || "0.0.0.0",
       state: "LISTENING",
-      isDevPort,
-      knownService,
-      isProtected: PROTECTED_PIDS.has(pid)
+      isDevPort: d,
+      knownService: l,
+      isProtected: he.has(r)
     });
   }
-  await attachWindowsProcessNames(entries, warnings);
-  return entries;
+  return await Vt(n, e), n;
 }
-async function attachWindowsProcessNames(entries, warnings) {
-  if (entries.length === 0) return;
-  try {
-    const { stdout } = await capture("tasklist", ["/FO", "CSV", "/NH"]);
-    const names = /* @__PURE__ */ new Map();
-    for (const line of stdout.split(/\r?\n/)) {
-      const fields = line.match(/"([^"]*)"/g);
-      if (!fields || fields.length < 2) continue;
-      const name = fields[0].replace(/"/g, "");
-      const pid = Number(fields[1].replace(/"/g, ""));
-      if (Number.isFinite(pid)) names.set(pid, name);
+async function Vt(e, t) {
+  if (e.length !== 0)
+    try {
+      const { stdout: n } = await $("tasklist", ["/FO", "CSV", "/NH"]), o = /* @__PURE__ */ new Map();
+      for (const s of n.split(/\r?\n/)) {
+        const i = s.match(/"([^"]*)"/g);
+        if (!i || i.length < 2) continue;
+        const r = i[0].replace(/"/g, ""), a = Number(i[1].replace(/"/g, ""));
+        Number.isFinite(a) && o.set(a, r);
+      }
+      for (const s of e)
+        s.processName = o.get(s.pid);
+    } catch (n) {
+      t.push(`Could not resolve process names: ${n.message}`);
     }
-    for (const entry of entries) {
-      entry.processName = names.get(entry.pid);
-    }
-  } catch (e) {
-    warnings.push(`Could not resolve process names: ${e.message}`);
-  }
 }
-async function listPortsUnix(warnings) {
+async function Ht(e) {
   try {
-    const { stdout } = await capture("lsof", ["-nP", "-iTCP", "-sTCP:LISTEN"]);
-    const entries = [];
-    for (const line of stdout.split("\n").slice(1)) {
-      const parts = line.trim().split(/\s+/);
-      if (parts.length < 9) continue;
-      const processName = parts[0];
-      const pid = Number(parts[1]);
-      const name = parts[8];
-      if (!Number.isFinite(pid)) continue;
-      const separator = name.lastIndexOf(":");
-      if (separator === -1) continue;
-      const port = Number(name.slice(separator + 1));
-      if (!Number.isFinite(port) || port === 0) continue;
-      const { isDevPort, knownService } = classifyPort(port);
-      entries.push({
-        port,
-        pid,
+    const { stdout: t } = await $("lsof", ["-nP", "-iTCP", "-sTCP:LISTEN"]), n = [];
+    for (const o of t.split(`
+`).slice(1)) {
+      const s = o.trim().split(/\s+/);
+      if (s.length < 9) continue;
+      const i = s[0], r = Number(s[1]), a = s[8];
+      if (!Number.isFinite(r)) continue;
+      const c = a.lastIndexOf(":");
+      if (c === -1) continue;
+      const d = Number(a.slice(c + 1));
+      if (!Number.isFinite(d) || d === 0) continue;
+      const { isDevPort: l, knownService: u } = Ue(d);
+      n.push({
+        port: d,
+        pid: r,
         protocol: "TCP",
-        address: name.slice(0, separator) || "*",
+        address: a.slice(0, c) || "*",
         state: "LISTEN",
-        processName,
-        isDevPort,
-        knownService,
-        isProtected: PROTECTED_PIDS.has(pid)
+        processName: i,
+        isDevPort: l,
+        knownService: u,
+        isProtected: he.has(r)
       });
     }
-    return entries;
-  } catch (e) {
-    warnings.push(e.message);
-    return [];
+    return n;
+  } catch (t) {
+    return e.push(t.message), [];
   }
 }
-async function killByPid(pid, expectedPort) {
-  if (!Number.isInteger(pid) || pid <= 0) {
+async function qt(e, t) {
+  if (!Number.isInteger(e) || e <= 0)
     throw new Error("Invalid process id.");
-  }
-  if (PROTECTED_PIDS.has(pid)) {
+  if (he.has(e))
     throw new Error("That is a protected system process and cannot be stopped.");
-  }
-  const { entries } = await listPorts();
-  const match = entries.find((e) => e.pid === pid && e.port === expectedPort);
-  if (!match) {
+  const { entries: n } = await We(), o = n.find((i) => i.pid === e && i.port === t);
+  if (!o)
     throw new Error(
-      `Nothing is listening on port ${expectedPort} with PID ${pid} any more. Refresh the list.`
+      `Nothing is listening on port ${t} with PID ${e} any more. Refresh the list.`
     );
-  }
-  const result = isWindows ? await capture("taskkill", ["/PID", String(pid), "/F", "/T"]) : await capture("kill", ["-9", String(pid)]);
-  if (result.code !== 0) {
-    const detail = (result.stderr || result.stdout).trim();
+  const s = G ? await $("taskkill", ["/PID", String(e), "/F", "/T"]) : await $("kill", ["-9", String(e)]);
+  if (s.code !== 0) {
+    const i = (s.stderr || s.stdout).trim();
     throw new Error(
-      detail.toLowerCase().includes("access is denied") || detail.toLowerCase().includes("not permitted") ? `Access denied stopping PID ${pid}. It may need administrator rights.` : detail || `Could not stop PID ${pid}.`
+      i.toLowerCase().includes("access is denied") || i.toLowerCase().includes("not permitted") ? `Access denied stopping PID ${e}. It may need administrator rights.` : i || `Could not stop PID ${e}.`
     );
   }
   return {
-    pid,
-    killed: true,
-    message: `Stopped ${match.processName ?? `PID ${pid}`} on port ${expectedPort}.`
+    pid: e,
+    killed: !0,
+    message: `Stopped ${o.processName ?? `PID ${e}`} on port ${t}.`
   };
 }
-const EXAMPLE_NAMES = [".env.example", ".env.sample", ".env.template", ".env.dist"];
-const ACTIVE_NAMES = [".env", ".env.local", ".env.development", ".env.development.local"];
-const ENV_FILE_PATTERN = /^\.env(\..+)?$/;
-const MAX_ENV_DEPTH = 3;
-const SKIP_DIRS = /* @__PURE__ */ new Set([
+const Jt = [".env.example", ".env.sample", ".env.template", ".env.dist"], Se = [".env", ".env.local", ".env.development", ".env.development.local"], Kt = /^\.env(\..+)?$/, Yt = 3, Zt = /* @__PURE__ */ new Set([
   "node_modules",
   ".git",
   "dist",
@@ -1407,443 +1232,829 @@ const SKIP_DIRS = /* @__PURE__ */ new Set([
   ".idea",
   ".vscode"
 ]);
-function parseEnvKeys(contents) {
-  const keys = [];
-  const emptyKeys = /* @__PURE__ */ new Set();
-  const seen = /* @__PURE__ */ new Set();
-  for (const rawLine of contents.split(/\r?\n/)) {
-    const line = rawLine.trim();
-    if (!line || line.startsWith("#")) continue;
-    const withoutExport = line.startsWith("export ") ? line.slice(7).trim() : line;
-    const separator = withoutExport.indexOf("=");
-    if (separator <= 0) continue;
-    const key = withoutExport.slice(0, separator).trim();
-    if (!key || !/^[A-Za-z_][A-Za-z0-9_.]*$/.test(key)) continue;
-    const rawValue = withoutExport.slice(separator + 1).trim();
-    const unquoted = rawValue.replace(/^(['"])(.*)\1$/s, "$2").trim();
-    const isEmpty = unquoted.length === 0;
-    if (!seen.has(key)) {
-      seen.add(key);
-      keys.push(key);
-    }
-    if (isEmpty) emptyKeys.add(key);
-    else emptyKeys.delete(key);
+function Xt(e) {
+  const t = [], n = /* @__PURE__ */ new Set(), o = /* @__PURE__ */ new Set();
+  for (const s of e.split(/\r?\n/)) {
+    const i = s.trim();
+    if (!i || i.startsWith("#")) continue;
+    const r = i.startsWith("export ") ? i.slice(7).trim() : i, a = r.indexOf("=");
+    if (a <= 0) continue;
+    const c = r.slice(0, a).trim();
+    if (!c || !/^[A-Za-z_][A-Za-z0-9_.]*$/.test(c)) continue;
+    const u = r.slice(a + 1).trim().replace(/^(['"])(.*)\1$/s, "$2").trim().length === 0;
+    o.has(c) || (o.add(c), t.push(c)), u ? n.add(c) : n.delete(c);
   }
-  return { keys, emptyKeys };
+  return { keys: t, emptyKeys: n };
 }
-async function readEnvFile(filePath) {
+async function Qt(e) {
   try {
-    const contents = await promises.readFile(filePath, "utf8");
-    return parseEnvKeys(contents);
+    const t = await j.readFile(e, "utf8");
+    return Xt(t);
   } catch {
     return null;
   }
 }
-async function findEnvDirectories(root) {
-  const found = /* @__PURE__ */ new Map();
-  const queue = [{ dir: root, depth: 0 }];
-  while (queue.length > 0) {
-    const { dir, depth } = queue.shift();
-    let entries;
+async function en(e) {
+  const t = /* @__PURE__ */ new Map(), n = [{ dir: e, depth: 0 }];
+  for (; n.length > 0; ) {
+    const { dir: o, depth: s } = n.shift();
+    let i;
     try {
-      entries = await promises.readdir(dir, { withFileTypes: true });
+      i = await j.readdir(o, { withFileTypes: !0 });
     } catch {
       continue;
     }
-    const envFiles = [];
-    for (const entry of entries) {
-      if (entry.isFile() && ENV_FILE_PATTERN.test(entry.name)) {
-        envFiles.push(entry.name);
+    const r = [];
+    for (const a of i) {
+      if (a.isFile() && Kt.test(a.name)) {
+        r.push(a.name);
         continue;
       }
-      if (entry.isDirectory() && !entry.isSymbolicLink() && depth < MAX_ENV_DEPTH && !SKIP_DIRS.has(entry.name)) {
-        queue.push({ dir: path.join(dir, entry.name), depth: depth + 1 });
-      }
+      a.isDirectory() && !a.isSymbolicLink() && s < Yt && !Zt.has(a.name) && n.push({ dir: p.join(o, a.name), depth: s + 1 });
     }
-    if (envFiles.length > 0) {
-      found.set(path.relative(root, dir), envFiles.sort());
-    }
+    r.length > 0 && t.set(p.relative(e, o), r.sort());
   }
-  return found;
+  return t;
 }
-async function isEnvGitIgnored(projectRoot, relativeDir) {
-  const candidates = [path.join(projectRoot, ".gitignore")];
-  if (relativeDir) {
-    candidates.push(path.join(projectRoot, relativeDir, ".gitignore"));
-  }
-  for (const gitignorePath of candidates) {
+async function tn(e, t) {
+  const n = [p.join(e, ".gitignore")];
+  t && n.push(p.join(e, t, ".gitignore"));
+  for (const o of n)
     try {
-      const contents = await promises.readFile(gitignorePath, "utf8");
-      const covered = contents.split(/\r?\n/).map((l) => l.trim()).some(
-        (l) => l === ".env" || l === ".env*" || l === "*.env" || l === ".env.*" || l === "**/.env" || l.endsWith("/.env")
-      );
-      if (covered) return true;
+      if ((await j.readFile(o, "utf8")).split(/\r?\n/).map((r) => r.trim()).some(
+        (r) => r === ".env" || r === ".env*" || r === "*.env" || r === ".env.*" || r === "**/.env" || r.endsWith("/.env")
+      )) return !0;
     } catch {
     }
-  }
-  return false;
+  return !1;
 }
-async function auditLocation(projectRoot, relativeDir, envFiles) {
-  const warnings = [];
-  const absoluteDir = path.join(projectRoot, relativeDir);
-  const parsedByName = /* @__PURE__ */ new Map();
-  const files = [];
-  for (const fileName of envFiles) {
-    const parsed = await readEnvFile(path.join(absoluteDir, fileName));
-    if (!parsed) {
-      warnings.push(`Could not read ${fileName}.`);
+async function nn(e, t, n) {
+  const o = [], s = p.join(e, t), i = /* @__PURE__ */ new Map(), r = [];
+  for (const y of n) {
+    const E = await Qt(p.join(s, y));
+    if (!E) {
+      o.push(`Could not read ${y}.`);
       continue;
     }
-    parsedByName.set(fileName, parsed);
-    files.push({
-      fileName,
-      keyCount: parsed.keys.length,
-      emptyKeys: parsed.emptyKeys.size
+    i.set(y, E), r.push({
+      fileName: y,
+      keyCount: E.keys.length,
+      emptyKeys: E.emptyKeys.size
     });
   }
-  const exampleFile = EXAMPLE_NAMES.find((name) => parsedByName.has(name));
-  const activeFile = ACTIVE_NAMES.find((name) => parsedByName.has(name));
-  const example = exampleFile ? parsedByName.get(exampleFile) : void 0;
-  const active = activeFile ? parsedByName.get(activeFile) : void 0;
-  const keys = [];
-  let missingCount = 0;
-  let emptyCount = 0;
-  let extraCount = 0;
-  if (example && active) {
-    const activeKeys = new Set(active.keys);
-    for (const key of example.keys) {
-      if (!activeKeys.has(key)) {
-        keys.push({ key, status: "missing" });
-        missingCount += 1;
-      } else if (active.emptyKeys.has(key)) {
-        keys.push({ key, status: "empty" });
-        emptyCount += 1;
-      } else {
-        keys.push({ key, status: "ok" });
-      }
+  const a = Jt.find((y) => i.has(y)), c = Se.find((y) => i.has(y)), d = a ? i.get(a) : void 0, l = c ? i.get(c) : void 0, u = [];
+  let k = 0, w = 0, m = 0;
+  if (d && l) {
+    const y = new Set(l.keys);
+    for (const A of d.keys)
+      y.has(A) ? l.emptyKeys.has(A) ? (u.push({ key: A, status: "empty" }), w += 1) : u.push({ key: A, status: "ok" }) : (u.push({ key: A, status: "missing" }), k += 1);
+    const E = new Set(d.keys);
+    for (const A of l.keys)
+      E.has(A) || (u.push({ key: A, status: "extra" }), m += 1);
+  } else if (l) {
+    for (const y of l.keys) {
+      const E = l.emptyKeys.has(y);
+      u.push({ key: y, status: E ? "empty" : "ok" }), E && (w += 1);
     }
-    const exampleKeys = new Set(example.keys);
-    for (const key of active.keys) {
-      if (!exampleKeys.has(key)) {
-        keys.push({ key, status: "extra" });
-        extraCount += 1;
-      }
-    }
-  } else if (active) {
-    for (const key of active.keys) {
-      const isEmpty = active.emptyKeys.has(key);
-      keys.push({ key, status: isEmpty ? "empty" : "ok" });
-      if (isEmpty) emptyCount += 1;
-    }
-    warnings.push("No .env.example here, so missing keys cannot be detected.");
-  } else if (example) {
-    for (const key of example.keys) {
-      keys.push({ key, status: "missing" });
-      missingCount += 1;
-    }
-    warnings.push(`${exampleFile} exists but there is no .env file.`);
+    o.push("No .env.example here, so missing keys cannot be detected.");
+  } else if (d) {
+    for (const y of d.keys)
+      u.push({ key: y, status: "missing" }), k += 1;
+    o.push(`${a} exists but there is no .env file.`);
   }
-  const hasRealEnv = ACTIVE_NAMES.some((name) => parsedByName.has(name));
-  const envNotIgnored = hasRealEnv && !await isEnvGitIgnored(projectRoot, relativeDir);
+  const C = Se.some((y) => i.has(y)) && !await tn(e, t);
   return {
-    relativeDir,
-    label: relativeDir ? relativeDir.replace(/\\/g, "/") : "project root",
-    exampleFile,
-    activeFile,
-    files,
-    keys,
-    missingCount,
-    emptyCount,
-    extraCount,
-    envNotIgnored,
-    warnings
+    relativeDir: t,
+    label: t ? t.replace(/\\/g, "/") : "project root",
+    exampleFile: a,
+    activeFile: c,
+    files: r,
+    keys: u,
+    missingCount: k,
+    emptyCount: w,
+    extraCount: m,
+    envNotIgnored: C,
+    warnings: o
   };
 }
-async function auditProject(project) {
-  const warnings = [];
-  const base = {
-    projectId: project.id,
-    projectName: project.name,
-    projectPath: project.path,
-    pathExists: true,
+async function on(e) {
+  const t = [], n = {
+    projectId: e.id,
+    projectName: e.name,
+    projectPath: e.path,
+    pathExists: !0,
     locations: [],
     missingCount: 0,
     emptyCount: 0,
     extraCount: 0,
-    hasEnvFiles: false,
-    envNotIgnored: false,
-    warnings
+    hasEnvFiles: !1,
+    envNotIgnored: !1,
+    warnings: t
   };
-  if (!project.path || !fs.existsSync(project.path)) {
-    return { ...base, pathExists: false };
-  }
-  let envDirs;
+  if (!e.path || !h.existsSync(e.path))
+    return { ...n, pathExists: !1 };
+  let o;
   try {
-    envDirs = await findEnvDirectories(project.path);
-  } catch (e) {
-    warnings.push(`Could not scan the project folder: ${e.message}`);
-    return base;
+    o = await en(e.path);
+  } catch (r) {
+    return t.push(`Could not scan the project folder: ${r.message}`), n;
   }
-  if (envDirs.size === 0) return base;
-  const locations = [];
-  for (const [relativeDir, envFiles] of envDirs) {
-    locations.push(await auditLocation(project.path, relativeDir, envFiles));
-  }
-  locations.sort((a, b) => {
-    if (!a.relativeDir !== !b.relativeDir) return a.relativeDir ? 1 : -1;
-    const aScore = a.missingCount * 10 + a.emptyCount;
-    const bScore = b.missingCount * 10 + b.emptyCount;
-    if (aScore !== bScore) return bScore - aScore;
-    return a.label.localeCompare(b.label);
+  if (o.size === 0) return n;
+  const s = [];
+  for (const [r, a] of o)
+    s.push(await nn(e.path, r, a));
+  s.sort((r, a) => {
+    if (!r.relativeDir != !a.relativeDir) return r.relativeDir ? 1 : -1;
+    const c = r.missingCount * 10 + r.emptyCount, d = a.missingCount * 10 + a.emptyCount;
+    return c !== d ? d - c : r.label.localeCompare(a.label);
   });
-  const sum = (pick) => locations.reduce((total, location) => total + pick(location), 0);
+  const i = (r) => s.reduce((a, c) => a + r(c), 0);
   return {
-    ...base,
-    locations,
-    missingCount: sum((l) => l.missingCount),
-    emptyCount: sum((l) => l.emptyCount),
-    extraCount: sum((l) => l.extraCount),
-    hasEnvFiles: locations.some((l) => l.files.length > 0),
-    envNotIgnored: locations.some((l) => l.envNotIgnored),
-    warnings
+    ...n,
+    locations: s,
+    missingCount: i((r) => r.missingCount),
+    emptyCount: i((r) => r.emptyCount),
+    extraCount: i((r) => r.extraCount),
+    hasEnvFiles: s.some((r) => r.files.length > 0),
+    envNotIgnored: s.some((r) => r.envNotIgnored),
+    warnings: t
   };
 }
-async function auditEnvironments(projectId) {
-  const projects = getProjects().filter((p) => !projectId || p.id === projectId);
-  const reports = [];
-  for (const project of projects) {
-    reports.push(await auditProject(project));
-  }
-  reports.sort((a, b) => {
-    const aScore = a.missingCount * 10 + a.emptyCount;
-    const bScore = b.missingCount * 10 + b.emptyCount;
-    if (aScore !== bScore) return bScore - aScore;
-    return a.projectName.localeCompare(b.projectName);
-  });
-  return {
-    reports,
-    projectsWithIssues: reports.filter((r) => r.missingCount > 0 || r.emptyCount > 0).length,
-    totalMissing: reports.reduce((sum, r) => sum + r.missingCount, 0)
+async function sn(e) {
+  const t = R().filter((o) => !e || o.id === e), n = [];
+  for (const o of t)
+    n.push(await on(o));
+  return n.sort((o, s) => {
+    const i = o.missingCount * 10 + o.emptyCount, r = s.missingCount * 10 + s.emptyCount;
+    return i !== r ? r - i : o.projectName.localeCompare(s.projectName);
+  }), {
+    reports: n,
+    projectsWithIssues: n.filter((o) => o.missingCount > 0 || o.emptyCount > 0).length,
+    totalMissing: n.reduce((o, s) => o + s.missingCount, 0)
   };
 }
-const LOCKFILES = [
+const rn = [
   { file: "pnpm-lock.yaml", manager: "pnpm", prefix: "pnpm" },
   { file: "yarn.lock", manager: "yarn", prefix: "yarn" },
   { file: "bun.lockb", manager: "bun", prefix: "bun run" },
   { file: "bun.lock", manager: "bun", prefix: "bun run" },
   { file: "package-lock.json", manager: "npm", prefix: "npm run" }
 ];
-function detectRunner(projectPath) {
-  for (const { file, manager, prefix } of LOCKFILES) {
-    if (fs.existsSync(path.join(projectPath, file))) return { manager, prefix };
-  }
+function Be(e) {
+  for (const { file: t, manager: n, prefix: o } of rn)
+    if (h.existsSync(p.join(e, t))) return { manager: n, prefix: o };
   return { manager: "npm", prefix: "npm run" };
 }
-async function readScripts(projectPath) {
-  const packageJsonPath = path.join(projectPath, "package.json");
-  if (!fs.existsSync(packageJsonPath)) return null;
+async function Ge(e) {
+  const t = p.join(e, "package.json");
+  if (!h.existsSync(t)) return null;
   try {
-    const parsed = JSON.parse(await promises.readFile(packageJsonPath, "utf8"));
-    const scripts = parsed == null ? void 0 : parsed.scripts;
-    if (!scripts || typeof scripts !== "object") return null;
-    const clean = {};
-    for (const [name, body] of Object.entries(scripts)) {
-      if (typeof body === "string") clean[name] = body;
-    }
-    return clean;
+    const n = JSON.parse(await j.readFile(t, "utf8")), o = n == null ? void 0 : n.scripts;
+    if (!o || typeof o != "object") return null;
+    const s = {};
+    for (const [i, r] of Object.entries(o))
+      typeof r == "string" && (s[i] = r);
+    return s;
   } catch {
     return null;
   }
 }
-async function indexScripts() {
-  const projects = getProjects();
-  const scripts = [];
-  const warnings = [];
-  let projectsIndexed = 0;
-  for (const project of projects) {
-    const pathExists = Boolean(project.path) && fs.existsSync(project.path);
-    if (!pathExists) continue;
-    const found = await readScripts(project.path);
-    if (!found) continue;
-    projectsIndexed += 1;
-    const { manager, prefix } = detectRunner(project.path);
-    for (const [scriptName, scriptBody] of Object.entries(found)) {
-      scripts.push({
-        projectId: project.id,
-        projectName: project.name,
-        projectPath: project.path,
-        pathExists,
-        packageManager: manager,
-        scriptName,
-        scriptBody,
-        runCommand: `${prefix} ${scriptName}`
+async function an() {
+  const e = R(), t = [], n = [];
+  let o = 0;
+  for (const r of e) {
+    const a = !!r.path && h.existsSync(r.path);
+    if (!a) continue;
+    const c = await Ge(r.path);
+    if (!c) continue;
+    o += 1;
+    const { manager: d, prefix: l } = Be(r.path);
+    for (const [u, k] of Object.entries(c))
+      t.push({
+        projectId: r.id,
+        projectName: r.name,
+        projectPath: r.path,
+        pathExists: a,
+        packageManager: d,
+        scriptName: u,
+        scriptBody: k,
+        runCommand: `${l} ${u}`
       });
+  }
+  const s = /* @__PURE__ */ new Map();
+  for (const r of t)
+    s.set(r.scriptName, (s.get(r.scriptName) ?? 0) + 1);
+  const i = [...s.entries()].filter(([, r]) => r > 1).sort((r, a) => a[1] - r[1] || r[0].localeCompare(a[0])).map(([r]) => r);
+  return t.sort(
+    (r, a) => r.projectName.localeCompare(a.projectName) || r.scriptName.localeCompare(a.scriptName)
+  ), { scripts: t, projectsIndexed: o, sharedNames: i, warnings: n };
+}
+async function cn(e, t) {
+  const n = R().find((a) => a.id === e);
+  if (!n) throw new Error("Project not found.");
+  if (!h.existsSync(n.path))
+    throw new Error(`The folder "${n.path}" no longer exists.`);
+  const o = await Ge(n.path);
+  if (!o)
+    throw new Error(`${n.name} has no package.json scripts.`);
+  if (!Object.prototype.hasOwnProperty.call(o, t))
+    throw new Error(`"${t}" is not a script in ${n.name}.`);
+  const { prefix: s } = Be(n.path), i = `${s} ${t}`, r = await X(i, n.path);
+  return { command: i, result: r };
+}
+const oe = {
+  isRepository: !1,
+  modifiedFiles: 0,
+  untrackedFiles: 0,
+  ahead: 0,
+  behind: 0
+};
+function dn(e) {
+  return h.existsSync(p.join(e, ".git"));
+}
+async function q(e, t, n = 8e3) {
+  return $("git", ["-C", e, ...t], n);
+}
+async function ln(e) {
+  if (!dn(e)) return { ...oe };
+  const t = { ...oe, isRepository: !0 };
+  try {
+    const { stdout: n, code: o } = await q(e, ["rev-parse", "--abbrev-ref", "HEAD"]);
+    if (o === 0) {
+      const s = n.trim();
+      s && (t.branch = s);
+    }
+  } catch {
+    return { ...oe, isRepository: !0 };
+  }
+  try {
+    const { stdout: n, code: o } = await q(e, ["status", "--porcelain"]);
+    if (o === 0)
+      for (const s of n.split(/\r?\n/))
+        s.trim() && (s.startsWith("??") ? t.untrackedFiles += 1 : t.modifiedFiles += 1);
+  } catch {
+  }
+  try {
+    const { stdout: n, code: o } = await q(e, [
+      "rev-list",
+      "--count",
+      "--left-right",
+      "@{upstream}...HEAD"
+    ]);
+    if (o === 0) {
+      const [s, i] = n.trim().split(/\s+/).map(Number);
+      Number.isFinite(s) && (t.behind = s), Number.isFinite(i) && (t.ahead = i);
+    }
+  } catch {
+  }
+  try {
+    const { stdout: n, code: o } = await q(e, [
+      "log",
+      "-1",
+      "--format=%ct%x00%s"
+    ]);
+    if (o === 0 && n.trim()) {
+      const [s, i] = n.trim().split("\0"), r = Number(s);
+      Number.isFinite(r) && (t.lastCommitAt = r * 1e3), i && (t.lastCommitMessage = i.trim());
+    }
+  } catch {
+  }
+  return t;
+}
+async function un() {
+  try {
+    const { code: e } = await $("git", ["--version"], 5e3);
+    return e === 0;
+  } catch {
+    return !1;
+  }
+}
+function ze(e) {
+  const t = e.trim(), n = /^[A-Za-z0-9_.-]+@[A-Za-z0-9_.-]+:(.+)$/.exec(t);
+  let s = n ? n[1] : null;
+  if (!s)
+    try {
+      const a = new URL(t);
+      if (!["https:", "http:", "ssh:", "git:"].includes(a.protocol)) return null;
+      s = a.pathname;
+    } catch {
+      return null;
+    }
+  const i = s.split("/").filter(Boolean).pop();
+  if (!i) return null;
+  const r = i.replace(/\.git$/i, "");
+  return !/^[A-Za-z0-9._-]+$/.test(r) || r === "." || r === ".." ? null : r;
+}
+function Ve(e) {
+  const t = e.trim();
+  if (!t) return { valid: !1, reason: "Enter a repository URL." };
+  if (/[\r\n\0]/.test(t))
+    return { valid: !1, reason: "That URL contains invalid characters." };
+  if (t.startsWith("-"))
+    return { valid: !1, reason: "That URL is not valid." };
+  if (/^(ext|file|fd)::/i.test(t) || t.startsWith("file://"))
+    return { valid: !1, reason: "Only http(s) and ssh remotes can be cloned." };
+  if (!/^[A-Za-z0-9_.-]+@[A-Za-z0-9_.-]+:.+$/.test(t)) {
+    let o;
+    try {
+      o = new URL(t);
+    } catch {
+      return { valid: !1, reason: "That is not a valid repository URL." };
+    }
+    if (!["https:", "http:", "ssh:", "git:"].includes(o.protocol))
+      return { valid: !1, reason: "Only http(s) and ssh remotes can be cloned." };
+  }
+  return ze(t) ? { valid: !0 } : { valid: !1, reason: "Could not work out a folder name from that URL." };
+}
+const pn = 24 * 60 * 60 * 1e3, mn = 90, fn = 60, hn = [
+  "pnpm-lock.yaml",
+  "yarn.lock",
+  "bun.lockb",
+  "bun.lock",
+  "package-lock.json"
+];
+function Ee(e, t) {
+  return e ? Math.floor((t - e) / pn) : null;
+}
+async function gn(e) {
+  const t = p.join(e, "package.json"), n = h.existsSync(t);
+  if (!n)
+    return { hasPackageJson: n, hasNodeModules: !1, lockfileName: void 0, lockfileDrift: !1 };
+  const o = h.existsSync(p.join(e, "node_modules")), s = hn.find((r) => h.existsSync(p.join(e, r)));
+  let i = !1;
+  if (s)
+    try {
+      const [r, a] = await Promise.all([
+        j.stat(t),
+        j.stat(p.join(e, s))
+      ]);
+      i = r.mtimeMs - a.mtimeMs > 6e4;
+    } catch {
+      i = !1;
+    }
+  return { hasPackageJson: n, hasNodeModules: o, lockfileName: s, lockfileDrift: i };
+}
+function wn(e) {
+  const t = [];
+  let n = 0;
+  const o = (s, i) => {
+    t.push(s), n += i;
+  };
+  if (!e.pathExists)
+    return o(
+      {
+        kind: "path-missing",
+        severity: "high",
+        label: "Folder missing",
+        detail: "The project folder no longer exists on disk."
+      },
+      100
+    ), { issues: t, score: n };
+  if (e.isRepository) {
+    const s = e.modifiedFiles + e.untrackedFiles;
+    s > 0 && o(
+      {
+        kind: "uncommitted-changes",
+        severity: s > 20 ? "high" : "medium",
+        label: `${s} uncommitted`,
+        detail: `${e.modifiedFiles} modified, ${e.untrackedFiles} untracked. This work only exists on this machine.`
+      },
+      Math.min(s, 30) + 10
+    ), e.ahead > 0 && o(
+      {
+        kind: "unpushed-commits",
+        severity: e.ahead > 5 ? "high" : "medium",
+        label: `${e.ahead} unpushed`,
+        detail: `${e.ahead} commit${e.ahead === 1 ? "" : "s"} on ${e.branch ?? "this branch"} have not been pushed.`
+      },
+      e.ahead * 3 + 10
+    ), e.daysSinceCommit !== null && e.daysSinceCommit >= mn && o(
+      {
+        kind: "stale-commits",
+        severity: "low",
+        label: `${e.daysSinceCommit}d since commit`,
+        detail: `Last commit was ${e.daysSinceCommit} days ago.`
+      },
+      5
+    );
+  } else
+    o(
+      {
+        kind: "no-git",
+        severity: "low",
+        label: "Not a repo",
+        detail: "This folder is not under version control."
+      },
+      4
+    );
+  return e.hasPackageJson && !e.hasNodeModules && o(
+    {
+      kind: "deps-not-installed",
+      severity: "medium",
+      label: "Deps not installed",
+      detail: "package.json exists but node_modules is missing. Install before running."
+    },
+    15
+  ), e.lockfileDrift && o(
+    {
+      kind: "lockfile-drift",
+      severity: "medium",
+      label: "Lockfile behind",
+      detail: `package.json is newer than ${e.lockfileName}. Dependencies may be out of sync.`
+    },
+    12
+  ), e.daysSinceOpened === null ? o(
+    {
+      kind: "never-opened",
+      severity: "low",
+      label: "Never opened",
+      detail: "This project has never been opened from Dev Launcher."
+    },
+    2
+  ) : e.daysSinceOpened >= fn && o(
+    {
+      kind: "never-opened",
+      severity: "low",
+      label: `${e.daysSinceOpened}d untouched`,
+      detail: `Not opened from Dev Launcher in ${e.daysSinceOpened} days.`
+    },
+    3
+  ), { issues: t, score: n };
+}
+async function yn(e) {
+  const t = R(), n = [], o = [], s = await un();
+  s || n.push("git was not found on your PATH, so repository checks were skipped.");
+  const i = Date.now();
+  for (let r = 0; r < t.length; r += 1) {
+    const a = t[r];
+    e == null || e({
+      current: r + 1,
+      total: t.length,
+      projectName: a.name,
+      done: !1
+    });
+    const c = !!a.path && h.existsSync(a.path), d = c && s ? await ln(a.path) : {
+      isRepository: c ? h.existsSync(p.join(a.path, ".git")) : !1,
+      modifiedFiles: 0,
+      untrackedFiles: 0,
+      ahead: 0,
+      behind: 0,
+      branch: void 0,
+      lastCommitAt: void 0,
+      lastCommitMessage: void 0
+    }, l = c ? await gn(a.path) : { hasPackageJson: !1, hasNodeModules: !1, lockfileName: void 0, lockfileDrift: !1 }, u = {
+      projectId: a.id,
+      projectName: a.name,
+      projectPath: a.path,
+      pathExists: c,
+      isRepository: d.isRepository,
+      branch: d.branch,
+      modifiedFiles: d.modifiedFiles,
+      untrackedFiles: d.untrackedFiles,
+      ahead: d.ahead,
+      behind: d.behind,
+      lastCommitAt: d.lastCommitAt,
+      lastCommitMessage: d.lastCommitMessage,
+      daysSinceCommit: Ee(d.lastCommitAt, i),
+      hasPackageJson: l.hasPackageJson,
+      hasNodeModules: l.hasNodeModules,
+      lockfileName: l.lockfileName,
+      lockfileDrift: l.lockfileDrift,
+      lastOpenedAt: a.lastOpenedAt,
+      daysSinceOpened: Ee(a.lastOpenedAt, i)
+    }, { issues: k, score: w } = wn(u);
+    o.push({ ...u, issues: k, score: w });
+  }
+  return e == null || e({ current: t.length, total: t.length, projectName: "", done: !0 }), o.sort((r, a) => a.score - r.score || r.projectName.localeCompare(a.projectName)), {
+    entries: o,
+    scannedAt: i,
+    healthyCount: o.filter((r) => r.issues.length === 0).length,
+    needsAttentionCount: o.filter(
+      (r) => r.issues.some((a) => a.severity === "high" || a.severity === "medium")
+    ).length,
+    warnings: n
+  };
+}
+const vn = [
+  { lockfile: "pnpm-lock.yaml", command: "pnpm install" },
+  { lockfile: "yarn.lock", command: "yarn install" },
+  { lockfile: "bun.lockb", command: "bun install" },
+  { lockfile: "bun.lock", command: "bun install" },
+  { lockfile: "package-lock.json", command: "npm install" }
+];
+function kn(e, t, n) {
+  return new Promise((o, s) => {
+    var c, d;
+    const i = Ae(
+      "git",
+      ["clone", "--progress", "--", e, t],
+      {
+        shell: !1,
+        windowsHide: !0,
+        // Stop git from popping a GUI credential prompt that would hang us.
+        env: { ...process.env, GIT_TERMINAL_PROMPT: "0", GCM_INTERACTIVE: "never" }
+      }
+    );
+    let r = "";
+    const a = (l) => {
+      const u = l.toString();
+      r = (r + u).slice(-4e3);
+      for (const k of u.split(/\r?\n|\r/)) {
+        const w = k.trim();
+        w && n(w);
+      }
+    };
+    (c = i.stdout) == null || c.on("data", a), (d = i.stderr) == null || d.on("data", a), i.on("error", (l) => {
+      s(
+        l.code === "ENOENT" ? new Error("git was not found on your PATH.") : l
+      );
+    }), i.on("close", (l) => {
+      if (l === 0) {
+        o();
+        return;
+      }
+      const u = r.trim().split(/\r?\n/).slice(-3).join(" ");
+      s(new Error(u || `git clone exited with code ${l}.`));
+    });
+  });
+}
+async function bn(e, t) {
+  const n = [], o = (m, N, C, y = !1) => t == null ? void 0 : t({ phase: m, message: N, detail: C, done: y });
+  o("validating", "Checking the repository URL...");
+  const s = String(e.url ?? "").trim(), i = Ve(s);
+  if (!i.valid)
+    throw new Error(i.reason ?? "That repository URL is not valid.");
+  const r = p.resolve(String(e.destinationParent ?? "").trim());
+  if (!r || !h.existsSync(r))
+    throw new Error("Choose a destination folder that exists.");
+  if (!h.statSync(r).isDirectory())
+    throw new Error("The destination must be a folder.");
+  const c = String(e.folderName ?? "").trim() || ze(s);
+  if (!/^[A-Za-z0-9._-]+$/.test(c) || c === "." || c === "..")
+    throw new Error("That folder name is not valid.");
+  const d = p.join(r, c);
+  if (!p.resolve(d).startsWith(r + p.sep))
+    throw new Error("That folder name is not valid.");
+  if (h.existsSync(d))
+    throw new Error(`"${c}" already exists in that folder.`);
+  o("cloning", `Cloning into ${c}...`);
+  try {
+    await kn(s, d, (m) => {
+      o("cloning", `Cloning into ${c}...`, m);
+    });
+  } catch (m) {
+    try {
+      h.existsSync(d) && await j.rm(d, { recursive: !0, force: !0, maxRetries: 2 });
+    } catch {
+      n.push(`A partial clone may remain at ${d}.`);
+    }
+    throw m;
+  }
+  o("detecting", "Detecting the project stack...");
+  let l;
+  try {
+    l = Fe(d);
+  } catch (m) {
+    n.push(`Stack detection failed: ${m.message}`), l = {
+      name: c,
+      tags: [],
+      commands: [],
+      details: {
+        languages: [],
+        frameworks: [],
+        hasGit: !0,
+        hasDocker: !1
+      }
+    };
+  }
+  o("registering", "Adding it to your projects...");
+  const u = Oe({
+    name: l.name || c,
+    path: d,
+    description: l.description,
+    tags: l.tags,
+    isFavorite: !1,
+    commands: l.commands.map((m) => ({ ...m, id: m.id || T("cmd") }))
+  });
+  let k = !1;
+  if (e.installDependencies) {
+    const m = vn.find(
+      ({ lockfile: C }) => h.existsSync(p.join(d, C))
+    );
+    if (!h.existsSync(p.join(d, "package.json")))
+      n.push("No package.json found, so dependencies were not installed.");
+    else {
+      const C = (m == null ? void 0 : m.command) ?? "npm install";
+      o("installing", `Running ${C}...`);
+      try {
+        await X(C, d), k = !0;
+      } catch (y) {
+        n.push(`Could not start the install: ${y.message}`);
+      }
     }
   }
-  const nameCounts = /* @__PURE__ */ new Map();
-  for (const script of scripts) {
-    nameCounts.set(script.scriptName, (nameCounts.get(script.scriptName) ?? 0) + 1);
+  let w = !1;
+  if (e.openInEditor) {
+    const m = e.openInEditor;
+    if (!F[m])
+      n.push(`Unknown editor "${m}".`);
+    else {
+      o("opening", `Opening ${F[m].label}...`);
+      try {
+        await me(m, d, !1), w = !0;
+      } catch (N) {
+        n.push(N.message);
+      }
+    }
   }
-  const sharedNames = [...nameCounts.entries()].filter(([, count]) => count > 1).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([name]) => name);
-  scripts.sort(
-    (a, b) => a.projectName.localeCompare(b.projectName) || a.scriptName.localeCompare(b.scriptName)
-  );
-  return { scripts, projectsIndexed, sharedNames, warnings };
+  return o("done", `${u.name} is ready.`, void 0, !0), {
+    projectId: u.id,
+    projectName: u.name,
+    projectPath: d,
+    detectedTags: l.tags,
+    commandCount: l.commands.length,
+    installStarted: k,
+    editorOpened: w,
+    warnings: n
+  };
 }
-async function runScript(projectId, scriptName) {
-  const project = getProjects().find((p) => p.id === projectId);
-  if (!project) throw new Error("Project not found.");
-  if (!fs.existsSync(project.path)) {
-    throw new Error(`The folder "${project.path}" no longer exists.`);
-  }
-  const scripts = await readScripts(project.path);
-  if (!scripts) {
-    throw new Error(`${project.name} has no package.json scripts.`);
-  }
-  if (!Object.prototype.hasOwnProperty.call(scripts, scriptName)) {
-    throw new Error(`"${scriptName}" is not a script in ${project.name}.`);
-  }
-  const { prefix } = detectRunner(project.path);
-  const command = `${prefix} ${scriptName}`;
-  const result = await runCommandInTerminal(command, project.path);
-  return { command, result };
+const je = 200;
+function se(e, t) {
+  for (const n of _.getAllWindows())
+    n.isDestroyed() || n.webContents.send(e, t);
 }
-const MAX_DELETE_TARGETS = 200;
-function registerToolsIPC() {
-  ipcMain.handle(
+function Sn() {
+  f.handle(
     "tools:scanDisk",
-    handler("tools:scanDisk", async (_unused, event) => {
-      const windows = BrowserWindow.getAllWindows();
-      return scanNodeModules((progress) => {
-        for (const win2 of windows) {
-          if (!win2.isDestroyed()) win2.webContents.send("tools:diskScanProgress", progress);
-        }
+    g("tools:scanDisk", async (e, t) => Wt((n) => se("tools:diskScanProgress", n)))
+  ), f.handle(
+    "tools:deleteModules",
+    g("tools:deleteModules", (e) => {
+      if (!Array.isArray(e))
+        throw new Error("Expected a list of folders to delete.");
+      if (e.length === 0)
+        throw new Error("Nothing was selected.");
+      if (e.length > je)
+        throw new Error(`Too many folders selected (limit ${je}).`);
+      const t = e.map((n, o) => S(n, `Target ${o + 1}`));
+      return Bt(t);
+    })
+  ), f.handle(
+    "tools:listPorts",
+    g("tools:listPorts", () => We())
+  ), f.handle(
+    "tools:killPort",
+    g("tools:killPort", (e, t) => {
+      if (typeof e != "number" || !Number.isInteger(e) || e <= 0)
+        throw new Error("Invalid process id.");
+      if (typeof t != "number" || !Number.isInteger(t) || t <= 0 || t > 65535)
+        throw new Error("Invalid port number.");
+      return qt(e, t);
+    })
+  ), f.handle(
+    "tools:auditEnv",
+    g(
+      "tools:auditEnv",
+      (e) => sn(
+        e == null ? void 0 : v(e, "Project id")
+      )
+    )
+  ), f.handle(
+    "tools:indexScripts",
+    g("tools:indexScripts", () => an())
+  ), f.handle(
+    "tools:runScript",
+    g("tools:runScript", async (e, t) => {
+      const n = S(t, "Script name");
+      if (!/^[A-Za-z0-9_.:\-/ ]{1,120}$/.test(n))
+        throw new Error("That script name contains unsupported characters.");
+      const { command: o } = await cn(v(e, "Project id"), n);
+      return { command: o };
+    })
+  ), f.handle(
+    "tools:scanRadar",
+    g(
+      "tools:scanRadar",
+      () => yn((e) => se("tools:radarProgress", e))
+    )
+  ), f.handle(
+    "tools:validateCloneUrl",
+    g(
+      "tools:validateCloneUrl",
+      (e) => Ve(typeof e == "string" ? e : "")
+    )
+  ), f.handle(
+    "tools:clone",
+    g("tools:clone", (e) => {
+      const t = D(e, "Clone request");
+      return bn(
+        {
+          url: S(t.url, "Repository URL"),
+          destinationParent: S(t.destinationParent, "Destination folder"),
+          folderName: typeof t.folderName == "string" && t.folderName.trim() ? t.folderName.trim() : void 0,
+          installDependencies: J(
+            t.installDependencies,
+            "Install dependencies flag"
+          ),
+          openInEditor: typeof t.openInEditor == "string" && t.openInEditor ? t.openInEditor : void 0
+        },
+        (n) => se("tools:cloneProgress", n)
+      );
+    })
+  );
+}
+const En = ["editor", "command", "terminal", "folder", "url"], Ce = 30;
+function jn(e) {
+  if (!Array.isArray(e)) throw new Error("Steps must be an array.");
+  if (e.length > Ce) throw new Error(`A session can hold at most ${Ce} steps.`);
+  return e.map((t, n) => {
+    const o = D(t, `Step ${n + 1}`), s = String(o.kind ?? "");
+    if (!En.includes(s))
+      throw new Error(`Step ${n + 1} has an unknown type.`);
+    return {
+      id: typeof o.id == "string" ? o.id : "",
+      kind: s,
+      target: typeof o.target == "string" ? o.target : "",
+      label: typeof o.label == "string" ? o.label : s,
+      delayMs: Number(o.delayMs) || 0,
+      enabled: o.enabled !== !1,
+      sortOrder: n
+    };
+  });
+}
+function Cn() {
+  f.handle(
+    "sessions:get",
+    g(
+      "sessions:get",
+      (e) => z(v(e, "Project id"))
+    )
+  ), f.handle(
+    "sessions:getAll",
+    g("sessions:getAll", () => (bt(), ht()))
+  ), f.handle(
+    "sessions:update",
+    g("sessions:update", (e, t) => {
+      const n = D(t, "Updates");
+      return gt(v(e, "Project id"), {
+        steps: n.steps === void 0 ? void 0 : jn(n.steps),
+        autoCapture: n.autoCapture === void 0 ? void 0 : J(n.autoCapture, "Auto capture")
+      });
+    })
+  ), f.handle(
+    "sessions:clear",
+    g(
+      "sessions:clear",
+      (e) => wt(v(e, "Project id"))
+    )
+  ), f.handle(
+    "sessions:resume",
+    g("sessions:resume", async (e) => {
+      const t = _.getAllWindows();
+      return vt(v(e, "Project id"), (n) => {
+        for (const o of t)
+          o.isDestroyed() || o.webContents.send("sessions:resumeProgress", n);
       });
     })
   );
-  ipcMain.handle(
-    "tools:deleteModules",
-    handler("tools:deleteModules", (targets) => {
-      if (!Array.isArray(targets)) {
-        throw new Error("Expected a list of folders to delete.");
-      }
-      if (targets.length === 0) {
-        throw new Error("Nothing was selected.");
-      }
-      if (targets.length > MAX_DELETE_TARGETS) {
-        throw new Error(`Too many folders selected (limit ${MAX_DELETE_TARGETS}).`);
-      }
-      const paths = targets.map((t, i) => requireString(t, `Target ${i + 1}`));
-      return deleteNodeModules(paths);
-    })
-  );
-  ipcMain.handle(
-    "tools:listPorts",
-    handler("tools:listPorts", () => listPorts())
-  );
-  ipcMain.handle(
-    "tools:killPort",
-    handler("tools:killPort", (pid, port) => {
-      if (typeof pid !== "number" || !Number.isInteger(pid) || pid <= 0) {
-        throw new Error("Invalid process id.");
-      }
-      if (typeof port !== "number" || !Number.isInteger(port) || port <= 0 || port > 65535) {
-        throw new Error("Invalid port number.");
-      }
-      return killByPid(pid, port);
-    })
-  );
-  ipcMain.handle(
-    "tools:auditEnv",
-    handler(
-      "tools:auditEnv",
-      (projectId) => auditEnvironments(
-        projectId === void 0 || projectId === null ? void 0 : requireId(projectId, "Project id")
-      )
-    )
-  );
-  ipcMain.handle(
-    "tools:indexScripts",
-    handler("tools:indexScripts", () => indexScripts())
-  );
-  ipcMain.handle(
-    "tools:runScript",
-    handler("tools:runScript", async (projectId, scriptName) => {
-      const name = requireString(scriptName, "Script name");
-      if (!/^[A-Za-z0-9_.:\-/ ]{1,120}$/.test(name)) {
-        throw new Error("That script name contains unsupported characters.");
-      }
-      const { command } = await runScript(requireId(projectId, "Project id"), name);
-      return { command };
-    })
-  );
 }
-const __dirname$1 = path.dirname(fileURLToPath(import.meta.url));
-process.env.APP_ROOT = path.join(__dirname$1, "..");
-const VITE_DEV_SERVER_URL = process.env["VITE_DEV_SERVER_URL"];
-const MAIN_DIST = path.join(process.env.APP_ROOT, "dist-electron");
-const RENDERER_DIST = path.join(process.env.APP_ROOT, "dist");
-process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL ? path.join(process.env.APP_ROOT, "public") : RENDERER_DIST;
-let win;
-function createWindow() {
-  win = new BrowserWindow({
-    icon: path.join(process.env.VITE_PUBLIC, "electron-vite.svg"),
+const He = p.dirname(Ke(import.meta.url));
+process.env.APP_ROOT = p.join(He, "..");
+const U = process.env.VITE_DEV_SERVER_URL, Rn = p.join(process.env.APP_ROOT, "dist-electron"), qe = p.join(process.env.APP_ROOT, "dist");
+process.env.VITE_PUBLIC = U ? p.join(process.env.APP_ROOT, "public") : qe;
+let I;
+function Je() {
+  I = new _({
+    icon: p.join(process.env.VITE_PUBLIC, "electron-vite.svg"),
     width: 1280,
     height: 820,
     minWidth: 940,
     minHeight: 600,
     backgroundColor: "#181818",
     webPreferences: {
-      preload: path.join(__dirname$1, "preload.mjs"),
+      preload: p.join(He, "preload.mjs"),
       // Set explicitly rather than relying on Electron's defaults, so a major
       // version bump can never silently weaken the sandbox.
-      contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: true,
-      webviewTag: false
+      contextIsolation: !0,
+      nodeIntegration: !1,
+      sandbox: !0,
+      webviewTag: !1
     }
-  });
-  win.webContents.setWindowOpenHandler(({ url }) => {
-    if (url.startsWith("http://") || url.startsWith("https://")) {
-      shell.openExternal(url);
-    }
-    return { action: "deny" };
-  });
-  win.webContents.on("will-navigate", (event, url) => {
-    const isDevServer = VITE_DEV_SERVER_URL && url.startsWith(VITE_DEV_SERVER_URL);
-    if (!isDevServer && !url.startsWith("file://")) {
-      event.preventDefault();
-      if (url.startsWith("http://") || url.startsWith("https://")) {
-        shell.openExternal(url);
-      }
-    }
-  });
-  if (VITE_DEV_SERVER_URL) {
-    win.loadURL(VITE_DEV_SERVER_URL);
-  } else {
-    win.loadFile(path.join(RENDERER_DIST, "index.html"));
-  }
+  }), I.webContents.setWindowOpenHandler(({ url: e }) => ((e.startsWith("http://") || e.startsWith("https://")) && re.openExternal(e), { action: "deny" })), I.webContents.on("will-navigate", (e, t) => {
+    !(U && t.startsWith(U)) && !t.startsWith("file://") && (e.preventDefault(), (t.startsWith("http://") || t.startsWith("https://")) && re.openExternal(t));
+  }), U ? I.loadURL(U) : I.loadFile(p.join(qe, "index.html"));
 }
-app.on("window-all-closed", () => {
-  if (process.platform !== "darwin") {
-    app.quit();
-    win = null;
-  }
+B.on("window-all-closed", () => {
+  process.platform !== "darwin" && (B.quit(), I = null);
 });
-app.on("activate", () => {
-  if (BrowserWindow.getAllWindows().length === 0) {
-    createWindow();
-  }
+B.on("activate", () => {
+  _.getAllWindows().length === 0 && Je();
 });
-app.whenReady().then(() => {
-  registerProjectIPC();
-  registerGroupIPC();
-  registerDialogIPC();
-  registerToolsIPC();
-  createWindow();
+B.whenReady().then(() => {
+  Tt(), Ft(), Lt(), Sn(), Cn(), Je();
 });
 export {
-  MAIN_DIST,
-  RENDERER_DIST,
-  VITE_DEV_SERVER_URL
+  Rn as MAIN_DIST,
+  qe as RENDERER_DIST,
+  U as VITE_DEV_SERVER_URL
 };

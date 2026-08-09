@@ -6,6 +6,7 @@ import type * as HistoryTypes from './history';
 import type * as RuntimeTypes from './runtime';
 import type * as IntegrationTypes from './integration';
 import type * as ToolTypes from './tools';
+import type * as SessionTypes from './session';
 
 /** Result of validating a command configuration in the main process. */
 export interface CommandValidationResult {
@@ -121,6 +122,30 @@ declare global {
 
         indexScripts: () => Promise<ToolTypes.ScriptIndexResult>;
         runScript: (projectId: string, scriptName: string) => Promise<{ command: string }>;
+
+        scanRadar: () => Promise<ToolTypes.RadarResult>;
+        onRadarProgress: (
+          callback: (progress: ToolTypes.RadarProgress) => void,
+        ) => () => void;
+
+        validateCloneUrl: (url: string) => Promise<{ valid: boolean; reason?: string }>;
+        clone: (request: ToolTypes.CloneRequest) => Promise<ToolTypes.CloneResult>;
+        onCloneProgress: (
+          callback: (progress: ToolTypes.CloneProgress) => void,
+        ) => () => void;
+      };
+      sessionAPI: {
+        get: (projectId: string) => Promise<SessionTypes.ProjectSession>;
+        getAll: () => Promise<SessionTypes.ProjectSession[]>;
+        update: (
+          projectId: string,
+          updates: { steps?: SessionTypes.SessionStep[]; autoCapture?: boolean },
+        ) => Promise<SessionTypes.ProjectSession>;
+        clear: (projectId: string) => Promise<SessionTypes.ProjectSession>;
+        resume: (projectId: string) => Promise<SessionTypes.ResumeResult>;
+        onResumeProgress: (
+          callback: (progress: SessionTypes.ResumeProgress) => void,
+        ) => () => void;
       };
     };
   }

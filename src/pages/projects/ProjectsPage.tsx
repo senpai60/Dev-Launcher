@@ -26,6 +26,7 @@ import Drawer from "../../components/ui/Drawer/Drawer";
 import ConfirmDialog from "../../components/ui/ConfirmDialog/ConfirmDialog";
 import CommandRow from "../../components/ui/Command/CommandRow";
 import CommandFormDialog from "../../components/ui/Command/CommandFormDialog";
+import SessionPanel from "../../components/ui/Session/SessionPanel";
 import Input from "../../components/ui/Form/Input";
 import Checkbox from "../../components/ui/Form/Checkbox";
 import TagInput from "../../components/ui/Form/TagInput";
@@ -33,8 +34,9 @@ import FolderPicker from "../../components/ui/Form/FolderPicker";
 import { useToast } from "../../components/ui/Toast/ToastContext";
 import { useProjectContext } from "../../context/ProjectContext";
 import { useGroupContext } from "../../context/GroupContext";
-import { useProjectAPI } from "../../api/api";
+import { useProjectAPI, useSessionAPI } from "../../api/api";
 import { useCommandRunner } from "../../hooks/useCommandRunner";
+import { useSessionResume } from "../../hooks/useSessionResume";
 import { fuzzyFilter } from "../../utils/fuzzy";
 import type {
   DetectedProjectMeta,
@@ -87,7 +89,28 @@ const ProjectsPage: React.FC = () => {
   const projectContext = useProjectContext();
   const groupCtx = useGroupContext();
   const projectApi = useProjectAPI();
+  const sessionApi = useSessionAPI();
+
+  // How many enabled steps each project has, so cards can show a Resume button.
+  const [sessionCounts, setSessionCounts] = useState<Record<string, number>>({});
+
+  const loadSessionCounts = async () => {
+    if (!sessionApi.isAvailable) return;
+    try {
+      const sessions = await sessionApi.getAllSessions();
+      setSessionCounts(
+        Object.fromEntries(
+          sessions.map((s) => [s.projectId, s.steps.filter((step) => step.enabled).length]),
+        ),
+      );
+    } catch {
+      // Non-critical: cards simply won't show a Resume button.
+    }
+  };
   const { requestRun, runningCommandId, confirmElement } = useCommandRunner();
+  const { resume, resumingProjectId, progress: resumeProgress } = useSessionResume(() =>
+    projectContext?.loadAllProjects(),
+  );
 
   const allProjects = projectContext?.allProjects;
   const groups = groupCtx?.groups;
@@ -95,8 +118,15 @@ const ProjectsPage: React.FC = () => {
   useEffect(() => {
     projectContext?.loadAllProjects();
     groupCtx?.loadGroups?.();
+    void loadSessionCounts();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Steps are captured in main as you work, so refresh once a resume settles.
+  useEffect(() => {
+    if (!resumingProjectId) void loadSessionCounts();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resumingProjectId, drawerProjectId]);
 
   useEffect(() => {
     if (actionParam === "create") {
@@ -152,6 +182,7 @@ const ProjectsPage: React.FC = () => {
     isFavorite: p.isFavorite ?? false,
     pathExists: p.pathExists,
     commandCount: p.commands?.length ?? 0,
+    sessionStepCount: sessionCounts[p.id] ?? 0,
   }));
 
   /* -------------------------------------------------------------------- */
@@ -445,6 +476,8 @@ const ProjectsPage: React.FC = () => {
                   const project = (allProjects ?? []).find((item) => item.id === p.id);
                   if (project) openEditDialog(project);
                 }}
+                onResume={(p) => resume(p.id, p.name)}
+                isResuming={resumingProjectId === card.id}
                 menuItems={getMenuItems(card)}
               />
             ))}
@@ -501,6 +534,16 @@ const ProjectsPage: React.FC = () => {
                 <span>Folder</span>
               </button>
             </div>
+
+            {/* ---- Resume session -------------------------------------- */}
+            <SessionPanel
+              projectId={drawerProject.id}
+              projectName={drawerProject.name}
+              canResume={drawerProject.pathExists}
+              isResuming={resumingProjectId === drawerProject.id}
+              activeLabel={resumeProgress?.label}
+              onResume={() => resume(drawerProject.id, drawerProject.name)}
+            />
 
             {/* ---- Commands ------------------------------------------- */}
             <div className="drawer-section">

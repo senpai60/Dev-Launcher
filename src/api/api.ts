@@ -6,7 +6,13 @@ import type {
 } from "../../types/project";
 import type { ProjectGroup } from "../../types/group";
 import type { CommandValidationResult, SelectedFolder } from "../../types/global";
-import type { DiskScanProgress } from "../../types/tools";
+import type {
+  CloneProgress,
+  CloneRequest,
+  DiskScanProgress,
+  RadarProgress,
+} from "../../types/tools";
+import type { ResumeProgress, SessionStep } from "../../types/session";
 
 const PROJECTS_STORAGE_KEY = "dev_launcher_projects";
 const GROUPS_STORAGE_KEY = "dev_launcher_groups";
@@ -237,6 +243,43 @@ export const useToolsAPI = () => {
     indexScripts: () => require().indexScripts(),
     runScript: (projectId: string, scriptName: string) =>
       require().runScript(projectId, scriptName),
+
+    scanRadar: () => require().scanRadar(),
+    onRadarProgress: (callback: (progress: RadarProgress) => void) =>
+      toolsApi ? toolsApi.onRadarProgress(callback) : () => {},
+
+    validateCloneUrl: (url: string) => require().validateCloneUrl(url),
+    clone: (request: CloneRequest) => require().clone(request),
+    onCloneProgress: (callback: (progress: CloneProgress) => void) =>
+      toolsApi ? toolsApi.onCloneProgress(callback) : () => {},
+  };
+};
+
+/** Resume Session: capture what you did, replay it in one click. */
+export const useSessionAPI = () => {
+  const sessionApi = window?.api?.sessionAPI;
+
+  const require = () => {
+    if (!sessionApi) throw new Error(NO_DESKTOP);
+    return sessionApi;
+  };
+
+  return {
+    isAvailable: Boolean(sessionApi),
+
+    getSession: (projectId: string) => require().get(projectId),
+    getAllSessions: () => require().getAll(),
+
+    updateSession: (
+      projectId: string,
+      updates: { steps?: SessionStep[]; autoCapture?: boolean },
+    ) => require().update(projectId, updates),
+
+    clearSession: (projectId: string) => require().clear(projectId),
+    resumeSession: (projectId: string) => require().resume(projectId),
+
+    onResumeProgress: (callback: (progress: ResumeProgress) => void) =>
+      sessionApi ? sessionApi.onResumeProgress(callback) : () => {},
   };
 };
 

@@ -29,8 +29,12 @@ function run(spec: SpawnSpec, cwd: string): Promise<LaunchResult> {
         cwd,
         shell: false,
         detached: spec.detached,
-        stdio: "ignore",
+        // Detached windows own their own console. For everything else we keep
+        // stderr so a failure can be explained instead of reported as a bare
+        // exit code.
+        stdio: spec.detached ? "ignore" : ["ignore", "ignore", "pipe"],
         windowsHide: false,
+        windowsVerbatimArguments: spec.verbatim ?? false,
       });
     } catch (e) {
       reject(e);
@@ -38,6 +42,11 @@ function run(spec: SpawnSpec, cwd: string): Promise<LaunchResult> {
     }
 
     let settled = false;
+    let stderr = "";
+
+    child.stderr?.on("data", (chunk: Buffer) => {
+      stderr = (stderr + chunk.toString()).slice(-2000);
+    });
 
     child.on("error", (err: NodeJS.ErrnoException) => {
       if (settled) return;
@@ -64,11 +73,14 @@ function run(spec: SpawnSpec, cwd: string): Promise<LaunchResult> {
     child.on("close", (code) => {
       if (settled) return;
       settled = true;
+
       if (code === 0 || code === null) {
         resolve({ ok: true, detached: false });
-      } else {
-        reject(new Error(`"${spec.command}" exited with code ${code}.`));
+        return;
       }
+
+      const detail = stderr.trim().split(/\r?\n/).filter(Boolean).slice(-2).join(" ");
+      reject(new Error(detail || `"${spec.command}" exited with code ${code}.`));
     });
   });
 }
@@ -98,7 +110,16 @@ export async function openInEditor(
   } catch (e) {
     const label = EDITOR_BINARIES[editorKey]?.label ?? editorKey;
     const message = e instanceof Error ? e.message : String(e);
-    if (message.includes("was not found on your PATH")) {
+
+    // ENOENT on POSIX, or cmd.exe's "not recognized" / 9009 on Windows, all
+    // mean the launcher is not installed or not on PATH.
+    const notFound =
+      message.includes("was not found on your PATH") ||
+      message.includes("exited with code 9009") ||
+      /is not recognized as an internal or external command/i.test(message) ||
+      /command not found/i.test(message);
+
+    if (notFound) {
       throw new Error(
         `${label} was not detected. Make sure its command-line launcher is installed and on your PATH.`,
       );

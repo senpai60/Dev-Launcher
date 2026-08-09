@@ -1,5 +1,5 @@
 import { ipcRenderer } from "electron";
-import type { DiskScanProgress } from "../../types/tools";
+import type { CloneProgress, CloneRequest, DiskScanProgress, RadarProgress } from "../../types/tools";
 
 export const toolsAPI = {
   /* Disk reclaimer */
@@ -29,4 +29,27 @@ export const toolsAPI = {
   indexScripts: () => ipcRenderer.invoke("tools:indexScripts"),
   runScript: (projectId: string, scriptName: string) =>
     ipcRenderer.invoke("tools:runScript", projectId, scriptName),
+
+  /* Stale project radar */
+  scanRadar: () => ipcRenderer.invoke("tools:scanRadar"),
+
+  onRadarProgress: (callback: (progress: RadarProgress) => void) => {
+    const listener = (_event: unknown, progress: RadarProgress) => callback(progress);
+    ipcRenderer.on("tools:radarProgress", listener);
+    return () => {
+      ipcRenderer.removeListener("tools:radarProgress", listener);
+    };
+  },
+
+  /* Clone to running */
+  validateCloneUrl: (url: string) => ipcRenderer.invoke("tools:validateCloneUrl", url),
+  clone: (request: CloneRequest) => ipcRenderer.invoke("tools:clone", request),
+
+  onCloneProgress: (callback: (progress: CloneProgress) => void) => {
+    const listener = (_event: unknown, progress: CloneProgress) => callback(progress);
+    ipcRenderer.on("tools:cloneProgress", listener);
+    return () => {
+      ipcRenderer.removeListener("tools:cloneProgress", listener);
+    };
+  },
 };

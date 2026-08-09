@@ -9,6 +9,8 @@ import {
   runCommandInTerminal,
   type LaunchResult,
 } from "../integrations/launcher";
+import { captureStep } from "./session.service";
+import { EDITOR_BINARIES } from "../utils/platform";
 import type { Project, ProjectCommand } from "../../types/project";
 
 export function getProjects(): Project[] {
@@ -240,6 +242,9 @@ export async function runProjectCommand(
   const cwd = resolveWorkingDirectory(project.path, command.workingDirectory);
   const result = await runCommandInTerminal(command.command, cwd);
 
+  // Fold this into the project's resumable session.
+  captureStep(projectId, "command", command.id, command.name);
+
   const now = Date.now();
   const commands = (project.commands ?? []).map((c) =>
     c.id === commandId ? { ...c, lastRunAt: now } : c,
@@ -285,10 +290,14 @@ export async function launchProject(
 
   if (editorKey) {
     result = await openInEditor(editorKey, project.path, newWindow);
+    captureStep(id, "editor", editorKey, `Open in ${EDITOR_BINARIES[editorKey]?.label ?? editorKey}`);
   } else if (normalized === "terminal" || normalized === "open-in-terminal") {
     result = await openTerminal(project.path);
+    captureStep(id, "terminal", "", "Open terminal");
   } else {
     result = await openInExplorer(project.path);
+    // Opening Explorer is a one-off lookup, not part of a startup routine, so
+    // it is deliberately not captured.
   }
 
   // Only recorded once the launch actually succeeded.

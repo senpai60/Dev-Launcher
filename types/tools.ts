@@ -156,6 +156,123 @@ export type EnvAuditResult = {
 };
 
 /* -------------------------------------------------------------------------- */
+/*  Stale project radar                                                        */
+/* -------------------------------------------------------------------------- */
+
+export type RadarIssueKind =
+  | "path-missing"
+  | "uncommitted-changes"
+  | "unpushed-commits"
+  | "stale-commits"
+  | "never-opened"
+  | "deps-not-installed"
+  | "lockfile-drift"
+  | "no-git";
+
+export type RadarIssueSeverity = "high" | "medium" | "low";
+
+export type RadarIssue = {
+  kind: RadarIssueKind;
+  severity: RadarIssueSeverity;
+  /** Short label for the badge. */
+  label: string;
+  /** One-line explanation shown under the project. */
+  detail: string;
+};
+
+export type RadarEntry = {
+  projectId: string;
+  projectName: string;
+  projectPath: string;
+  pathExists: boolean;
+
+  isRepository: boolean;
+  branch?: string;
+  /** Working-tree file count, split by state. */
+  modifiedFiles: number;
+  untrackedFiles: number;
+  ahead: number;
+  behind: number;
+  lastCommitAt?: number;
+  lastCommitMessage?: string;
+  daysSinceCommit: number | null;
+
+  hasPackageJson: boolean;
+  hasNodeModules: boolean;
+  lockfileName?: string;
+  /** True when package.json is newer than the lockfile. */
+  lockfileDrift: boolean;
+
+  lastOpenedAt?: number;
+  daysSinceOpened: number | null;
+
+  issues: RadarIssue[];
+  /** 0 = healthy. Higher means more neglected. */
+  score: number;
+};
+
+export type RadarResult = {
+  entries: RadarEntry[];
+  scannedAt: number;
+  healthyCount: number;
+  needsAttentionCount: number;
+  warnings: string[];
+};
+
+export type RadarProgress = {
+  current: number;
+  total: number;
+  projectName: string;
+  done: boolean;
+};
+
+/* -------------------------------------------------------------------------- */
+/*  Clone to running                                                           */
+/* -------------------------------------------------------------------------- */
+
+export type CloneRequest = {
+  /** https or ssh git remote. */
+  url: string;
+  /** Existing directory the repository will be cloned into. */
+  destinationParent: string;
+  /** Folder name; defaults to the repository name. */
+  folderName?: string;
+  /** Run the detected package manager's install afterwards. */
+  installDependencies: boolean;
+  /** Open the project in this editor when finished. */
+  openInEditor?: string;
+};
+
+export type ClonePhase =
+  | "validating"
+  | "cloning"
+  | "detecting"
+  | "registering"
+  | "installing"
+  | "opening"
+  | "done"
+  | "failed";
+
+export type CloneProgress = {
+  phase: ClonePhase;
+  message: string;
+  /** Raw git output line, when there is one. */
+  detail?: string;
+  done: boolean;
+};
+
+export type CloneResult = {
+  projectId: string;
+  projectName: string;
+  projectPath: string;
+  detectedTags: string[];
+  commandCount: number;
+  installStarted: boolean;
+  editorOpened: boolean;
+  warnings: string[];
+};
+
+/* -------------------------------------------------------------------------- */
 /*  Script index                                                               */
 /* -------------------------------------------------------------------------- */
 

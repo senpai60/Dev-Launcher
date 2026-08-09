@@ -2,6 +2,8 @@ import { readProjects, writeProjects } from "../storage/project.storage";
 import {
   openInExplorer,
   openInVsCode,
+  openInCursor,
+  openInAntigravity,
   openTerminal,
 } from "../integrations/launcher";
 
@@ -74,13 +76,25 @@ export function launchProject(
 
   try {
     const projectPath = project.path;
-    switch (action) {
+    switch (action.toLowerCase()) {
       case "open-in-vscode":
+      case "vscode":
         openInVsCode(projectPath, newWindow, cb);
         break;
+      case "open-in-cursor":
+      case "cursor":
+        openInCursor(projectPath, cb);
+        break;
+      case "open-in-antigravity":
+      case "antigravity":
+        openInAntigravity(projectPath, cb);
+        break;
       case "open-in-terminal":
+      case "terminal":
         openTerminal(projectPath, cb);
         break;
+      case "folder":
+      case "explorer":
       default:
         openInExplorer(projectPath, cb);
         break;

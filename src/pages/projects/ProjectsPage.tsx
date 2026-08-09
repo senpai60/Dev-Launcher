@@ -45,6 +45,7 @@ const ProjectsPage: React.FC = () => {
   const createProject = projectContext?.createProject;
   const deleteProjectItem = projectContext?.deleteProjectItem;
   const editProject = projectContext?.editProject;
+  const openProject = projectContext?.openProject;
 
   useEffect(() => {
     loadAllProjects?.();
@@ -61,7 +62,7 @@ const ProjectsPage: React.FC = () => {
 
   const openCreateDialog = () => {
     setFormName("");
-    setFormPath("C:\\Projects\\");
+    setFormPath("");
     setFormDescription("");
     setFormTags(["React", "Express", "Node.js"]);
     setFormIsFavorite(false);
@@ -71,12 +72,12 @@ const ProjectsPage: React.FC = () => {
 
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formName.trim()) {
-      setFormError("Project name is required.");
+    if (!formPath.trim()) {
+      setFormError("Project location is required.");
       return;
     }
-    if (!formPath.trim()) {
-      setFormError("Project path is required.");
+    if (!formName.trim()) {
+      setFormError("Project name is required.");
       return;
     }
 
@@ -122,31 +123,31 @@ const ProjectsPage: React.FC = () => {
       id: "vscode",
       label: "Open in VS Code",
       icon: <Code2 size={14} />,
-      onClick: () => console.log("Opening in VS Code:", project.name),
+      onClick: () => openProject?.(project.id, "vscode"),
     },
     {
       id: "terminal",
       label: "Open Terminal",
       icon: <Terminal size={14} />,
-      onClick: () => console.log("Opening terminal:", project.name),
+      onClick: () => openProject?.(project.id, "terminal"),
     },
     {
       id: "folder",
       label: "Open Folder",
       icon: <Folder size={14} />,
-      onClick: () => console.log("Opening folder:", project.name),
+      onClick: () => openProject?.(project.id, "folder"),
     },
     {
       id: "run",
       label: "Run Command",
       icon: <Play size={14} />,
-      onClick: () => console.log("Running command:", project.name),
+      onClick: () => openProject?.(project.id, "terminal"),
     },
     {
       id: "git",
       label: "Git",
       icon: <GitBranch size={14} />,
-      onClick: () => console.log("Git overview:", project.name),
+      onClick: () => openProject?.(project.id, "terminal"),
     },
     { id: "div1", isDivider: true },
     {
@@ -211,9 +212,9 @@ const ProjectsPage: React.FC = () => {
                 key={project.id}
                 project={project}
                 onToggleFavorite={toggleFavorite}
-                onOpenFolder={(p) => console.log("Open Folder", p.path)}
-                onOpenVSCode={(p) => console.log("VS Code", p.path)}
-                onOpenTerminal={(p) => console.log("Terminal", p.path)}
+                onOpenFolder={(p) => openProject?.(p.id, "folder")}
+                onOpenVSCode={(p) => openProject?.(p.id, "vscode")}
+                onOpenTerminal={(p) => openProject?.(p.id, "terminal")}
                 menuItems={getDynamicMenuItems(project)}
               />
             ))}

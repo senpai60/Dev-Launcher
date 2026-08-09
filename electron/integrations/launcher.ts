@@ -1,6 +1,5 @@
 import { exec } from "child_process";
 import path from "node:path";
-import { stderr, stdout } from "node:process";
 
 export function openInVsCode(
   projectPath: string,
@@ -8,9 +7,7 @@ export function openInVsCode(
   cb?: (error: Error | null, stdout: string | null) => void,
 ) {
   const absolutePath = path.resolve(projectPath);
-
   const flag = newWindow ? "-n" : "-r";
-
   const command = `code ${flag} "${absolutePath}"`;
 
   exec(command, (err, stdout, stderr) => {
@@ -24,6 +21,42 @@ export function openInVsCode(
   });
 }
 
+export function openInCursor(
+  projectPath: string,
+  cb?: (error: Error | null, stdout: string | null) => void,
+) {
+  const absolutePath = path.resolve(projectPath);
+  const command = `cursor "${absolutePath}"`;
+
+  exec(command, (err, stdout, stderr) => {
+    if (err) {
+      console.error(`Failed to open Cursor: ${stderr}`);
+      if (cb) cb(err, null);
+      return;
+    }
+    console.log(`Opened ${absolutePath} in Cursor`);
+    if (cb) cb(null, stdout);
+  });
+}
+
+export function openInAntigravity(
+  projectPath: string,
+  cb?: (error: Error | null, stdout: string | null) => void,
+) {
+  const absolutePath = path.resolve(projectPath);
+  const command = `agy "${absolutePath}"`;
+
+  exec(command, (err, stdout, stderr) => {
+    if (err) {
+      console.error(`Failed to open Antigravity: ${stderr}`);
+      if (cb) cb(err, null);
+      return;
+    }
+    console.log(`Opened ${absolutePath} in Antigravity`);
+    if (cb) cb(null, stdout);
+  });
+}
+
 export function openTerminal(
   projectPath: string,
   cb?: (error: Error | null, stdout: string | null) => void,
@@ -33,7 +66,7 @@ export function openTerminal(
 
   exec(command, (err, stdout, stderr) => {
     if (err) {
-      console.error("error opening terminal", err);
+      console.error(`error opening terminal: ${stderr}`, err);
       if (cb) cb(err, null);
       return;
     }
@@ -47,7 +80,7 @@ export function openInExplorer(
   cb?: (error: Error | null, stdout: string | null) => void,
 ) {
   const absolutePath = path.resolve(projectPath);
-  const command = `explorer.exe /select,"${absolutePath}"`;
+  const command = `explorer.exe "${absolutePath}"`;
   exec(command, (err, stdout, stderr) => {
     if (err) {
       console.error(`Failed to open Explorer: ${stderr}`);

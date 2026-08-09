@@ -1,11 +1,32 @@
+import { useEffect } from "react";
 import { Terminal } from "lucide-react";
 import vscodeIcon from "../../app-icons/vscode.svg";
 import antigravityIcon from "../../app-icons/antigravity-color.svg";
 import cursorIcon from "../../app-icons/cursor.svg";
 import PageNavbar from "../../components/layout/navbar/PageNavbar";
+import { useProjectContext } from "../../context/ProjectContext";
 import "./homepage.css";
 
 const HomePage = () => {
+  const projectContext = useProjectContext();
+  const allProjects = projectContext?.allProjects;
+  const loadAllProjects = projectContext?.loadAllProjects;
+  const openProject = projectContext?.openProject;
+
+  useEffect(() => {
+    loadAllProjects?.();
+  }, []);
+
+  const heroProject = allProjects && allProjects.length > 0 ? allProjects[0] : null;
+
+  const handleLaunch = (action: string, id?: string) => {
+    const targetId = id || heroProject?.id;
+    if (targetId && openProject) {
+      openProject(targetId, action);
+    } else {
+      console.log(`Launching action: ${action} for project: ${targetId || 'demo'}`);
+    }
+  };
 
   return (
     <section className="home-dashboard">
@@ -22,23 +43,45 @@ const HomePage = () => {
           <h2 className="text-section-title">Continue Working</h2>
           <div className="continue-card">
             <div className="card-info">
-              <h3 className="text-project-name">BrutDesk</h3>
-              <p className="text-project-desc">React + Express</p>
+              <h3 className="text-project-name">{heroProject ? heroProject.name : "BrutDesk"}</h3>
+              <p className="text-project-desc">{heroProject ? (heroProject.tags?.join(" · ") || heroProject.path) : "React + Express"}</p>
               <p className="text-meta" style={{ marginTop: 'var(--space-2)' }}>Opened 4 min ago</p>
             </div>
             <div className="card-actions">
-              <button className="primary-action-btn text-button" title="Open Folder">Open</button>
+              <button
+                className="primary-action-btn text-button"
+                title="Open Folder"
+                onClick={() => handleLaunch("folder")}
+              >
+                Open
+              </button>
               <div className="app-launch-icons">
-                <button className="icon-btn" title="Open with VS Code">
+                <button
+                  className="icon-btn"
+                  title="Open with VS Code"
+                  onClick={() => handleLaunch("vscode")}
+                >
                   <img src={vscodeIcon} alt="VS Code" className="app-icon-img" />
                 </button>
-                <button className="icon-btn" title="Open with Antigravity">
+                <button
+                  className="icon-btn"
+                  title="Open with Antigravity"
+                  onClick={() => handleLaunch("antigravity")}
+                >
                   <img src={antigravityIcon} alt="Antigravity" className="app-icon-img" />
                 </button>
-                <button className="icon-btn" title="Open with Cursor">
+                <button
+                  className="icon-btn"
+                  title="Open with Cursor"
+                  onClick={() => handleLaunch("cursor")}
+                >
                   <img src={cursorIcon} alt="Cursor" className="app-icon-img" />
                 </button>
-                <button className="icon-btn" title="Open with Terminal">
+                <button
+                  className="icon-btn"
+                  title="Open with Terminal"
+                  onClick={() => handleLaunch("terminal")}
+                >
                   <Terminal size={16} />
                 </button>
               </div>
@@ -52,18 +95,23 @@ const HomePage = () => {
           <div className="dashboard-section recent-projects">
             <h2 className="text-section-title">Recent Projects</h2>
             <ul className="project-list">
-              <li className="project-item">
-                <span className="text-recent-project">BrutDesk</span>
-              </li>
-              <li className="project-item">
-                <span className="text-recent-project">Gym Website</span>
-              </li>
-              <li className="project-item">
-                <span className="text-recent-project">Tattoo Portfolio</span>
-              </li>
-              <li className="project-item">
-                <span className="text-recent-project">Electron Launcher</span>
-              </li>
+              {(allProjects && allProjects.length > 0
+                ? allProjects.slice(0, 4)
+                : [
+                    { id: "1", name: "BrutDesk" },
+                    { id: "2", name: "Gym Website" },
+                    { id: "3", name: "Tattoo Portfolio" },
+                    { id: "4", name: "Electron Launcher" },
+                  ]
+              ).map((p) => (
+                <li
+                  key={p.id}
+                  className="project-item"
+                  onClick={() => handleLaunch("vscode", p.id)}
+                >
+                  <span className="text-recent-project">{p.name}</span>
+                </li>
+              ))}
             </ul>
           </div>
 
@@ -97,11 +145,11 @@ const HomePage = () => {
             <h2 className="text-section-title">Quick Stats</h2>
             <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
               <div className="stat-card">
-                <h3 className="text-stat-number">12</h3>
+                <h3 className="text-stat-number">{allProjects ? allProjects.length : 12}</h3>
                 <p className="text-stat-label">Projects</p>
               </div>
               <div className="stat-card">
-                <h3 className="text-stat-number">4</h3>
+                <h3 className="text-stat-number">{allProjects ? allProjects.filter(p => p.isFavorite).length : 4}</h3>
                 <p className="text-stat-label">Favorites</p>
               </div>
               <div className="stat-card">

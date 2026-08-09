@@ -3,6 +3,7 @@ import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import path, { join } from "node:path";
 import { readFileSync, writeFileSync, mkdirSync } from "fs";
+import { exec } from "child_process";
 const dataDir = () => {
   const dir = join(app.getPath("userData"), "DevLauncher");
   mkdirSync(dir, { recursive: true });
@@ -36,6 +37,72 @@ function readProjects() {
 }
 function writeProjects(projects) {
   writeData("projects", projects);
+}
+function openInVsCode(projectPath, newWindow = false, cb) {
+  const absolutePath = path.resolve(projectPath);
+  const flag = newWindow ? "-n" : "-r";
+  const command = `code ${flag} "${absolutePath}"`;
+  exec(command, (err, stdout, stderr) => {
+    if (err) {
+      console.error(`Failed to open VS Code: ${stderr}`);
+      if (cb) cb(err, null);
+      return;
+    }
+    console.log(`Opened ${absolutePath} in VS Code`);
+    if (cb) cb(null, stdout);
+  });
+}
+function openInCursor(projectPath, cb) {
+  const absolutePath = path.resolve(projectPath);
+  const command = `cursor "${absolutePath}"`;
+  exec(command, (err, stdout, stderr) => {
+    if (err) {
+      console.error(`Failed to open Cursor: ${stderr}`);
+      if (cb) cb(err, null);
+      return;
+    }
+    console.log(`Opened ${absolutePath} in Cursor`);
+    if (cb) cb(null, stdout);
+  });
+}
+function openInAntigravity(projectPath, cb) {
+  const absolutePath = path.resolve(projectPath);
+  const command = `agy "${absolutePath}"`;
+  exec(command, (err, stdout, stderr) => {
+    if (err) {
+      console.error(`Failed to open Antigravity: ${stderr}`);
+      if (cb) cb(err, null);
+      return;
+    }
+    console.log(`Opened ${absolutePath} in Antigravity`);
+    if (cb) cb(null, stdout);
+  });
+}
+function openTerminal(projectPath, cb) {
+  const absolutePath = path.resolve(projectPath);
+  const command = `start cmd /k cd "${absolutePath}"`;
+  exec(command, (err, stdout, stderr) => {
+    if (err) {
+      console.error(`error opening terminal: ${stderr}`, err);
+      if (cb) cb(err, null);
+      return;
+    }
+    console.log("terminal opend successfully", absolutePath);
+    if (cb) cb(null, stdout);
+  });
+}
+function openInExplorer(projectPath, cb) {
+  const absolutePath = path.resolve(projectPath);
+  const command = `explorer.exe "${absolutePath}"`;
+  exec(command, (err, stdout, stderr) => {
+    if (err) {
+      console.error(`Failed to open Explorer: ${stderr}`);
+      if (cb) cb(err, null);
+      return;
+    }
+    console.log(`Opened ${absolutePath} in Explorer`);
+    if (cb) cb(null, stdout);
+  });
 }
 function getProjects() {
   return readProjects();
@@ -73,6 +140,41 @@ function deleteProject(id) {
   writeProjects(filteredProjects);
   return true;
 }
+function launchProject(id, action, newWindow = false, cb) {
+  const project = getProject(id);
+  if (!project) {
+    if (cb) cb(new Error("Project not found"), null);
+    return;
+  }
+  try {
+    const projectPath = project.path;
+    switch (action.toLowerCase()) {
+      case "open-in-vscode":
+      case "vscode":
+        openInVsCode(projectPath, newWindow, cb);
+        break;
+      case "open-in-cursor":
+      case "cursor":
+        openInCursor(projectPath, cb);
+        break;
+      case "open-in-antigravity":
+      case "antigravity":
+        openInAntigravity(projectPath, cb);
+        break;
+      case "open-in-terminal":
+      case "terminal":
+        openTerminal(projectPath, cb);
+        break;
+      case "folder":
+      case "explorer":
+      default:
+        openInExplorer(projectPath, cb);
+        break;
+    }
+  } catch (error) {
+    cb(error, null);
+  }
+}
 function registerProjectIPC() {
   ipcMain.handle("projects:getAll", () => {
     return getProjects();
@@ -88,6 +190,17 @@ function registerProjectIPC() {
   });
   ipcMain.handle("projects:delete", (_, id) => {
     return deleteProject(id);
+  });
+  ipcMain.handle("projects:launch", async (_, id, action) => {
+    return new Promise((resolve, reject) => {
+      launchProject(id, action, false, (error, stdout) => {
+        if (error) {
+          reject(error);
+        } else {
+          resolve(stdout);
+        }
+      });
+    });
   });
 }
 createRequire(import.meta.url);

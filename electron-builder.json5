@@ -31,7 +31,7 @@
         "arch": ["x64"]
       }
     ],
-    "artifactName": "${productName}-Windows-${version}-Setup.${ext}"
+    "artifactName": "DevLauncher-Setup-${version}.${ext}"
   },
   "nsis": {
     "oneClick": false,

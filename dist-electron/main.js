@@ -1,92 +1,73 @@
-import { app, ipcMain, BrowserWindow, dialog, shell, globalShortcut, screen } from "electron";
-import { fileURLToPath } from "node:url";
-import path, { join } from "node:path";
-import fs, { existsSync, readFileSync, writeFileSync, renameSync, unlinkSync, copyFileSync, mkdirSync, promises } from "fs";
-import { randomUUID, createHash } from "node:crypto";
-import { spawn, execFile } from "child_process";
-import path$1 from "path";
-const SCHEMA_VERSION = 1;
-const dataDir = () => {
-  const dir = join(app.getPath("userData"), "DevLauncher");
-  mkdirSync(dir, { recursive: true });
-  return dir;
-};
-const dataPath = (filename) => join(dataDir(), `${filename}.json`);
-const quarantine = (filename) => {
-  const source = dataPath(filename);
-  if (!existsSync(source)) return null;
-  const backup = join(dataDir(), `${filename}.corrupt-${Date.now()}.json`);
+import { app as O, ipcMain as f, BrowserWindow as R, dialog as $e, shell as de, globalShortcut as Be, screen as Pe } from "electron";
+import { fileURLToPath as ct } from "node:url";
+import d, { join as he } from "node:path";
+import h, { existsSync as ge, readFileSync as dt, writeFileSync as lt, renameSync as ut, unlinkSync as pt, copyFileSync as mt, mkdirSync as ft, promises as S } from "fs";
+import { randomUUID as ht, createHash as gt } from "node:crypto";
+import { spawn as we, execFile as wt } from "child_process";
+import H from "path";
+const Ge = 1, ze = () => {
+  const e = he(O.getPath("userData"), "DevLauncher");
+  return ft(e, { recursive: !0 }), e;
+}, ye = (e) => he(ze(), `${e}.json`), yt = (e) => {
+  const t = ye(e);
+  if (!ge(t)) return null;
+  const n = he(ze(), `${e}.corrupt-${Date.now()}.json`);
   try {
-    copyFileSync(source, backup);
-    return backup;
-  } catch (e) {
-    console.error(`Could not quarantine ${filename}.json:`, e);
-    return null;
+    return mt(t, n), n;
+  } catch (o) {
+    return console.error(`Could not quarantine ${e}.json:`, o), null;
   }
-};
-const migrate = (parsed, filename) => {
-  if (Array.isArray(parsed)) {
-    console.log(`Migrating ${filename}.json from v0 (bare array) to v${SCHEMA_VERSION}`);
-    return parsed;
-  }
-  if (parsed && typeof parsed === "object" && Array.isArray(parsed.data)) {
-    return parsed.data;
-  }
-  throw new Error(`Unrecognised shape in ${filename}.json`);
-};
-const readData = (filename) => {
-  const source = dataPath(filename);
-  if (!existsSync(source)) return [];
-  let raw;
+}, vt = (e, t) => {
+  if (Array.isArray(e))
+    return console.log(`Migrating ${t}.json from v0 (bare array) to v${Ge}`), e;
+  if (e && typeof e == "object" && Array.isArray(e.data))
+    return e.data;
+  throw new Error(`Unrecognised shape in ${t}.json`);
+}, ve = (e) => {
+  const t = ye(e);
+  if (!ge(t)) return [];
+  let n;
   try {
-    raw = readFileSync(source, "utf8");
-  } catch (e) {
-    console.error(`Could not read ${filename}.json:`, e);
-    throw new Error(`Unable to read ${filename} storage.`);
+    n = dt(t, "utf8");
+  } catch (o) {
+    throw console.error(`Could not read ${e}.json:`, o), new Error(`Unable to read ${e} storage.`);
   }
-  if (raw.trim() === "") return [];
+  if (n.trim() === "") return [];
   try {
-    return migrate(JSON.parse(raw), filename);
-  } catch (e) {
-    const backup = quarantine(filename);
-    console.error(
-      `${filename}.json is corrupt and was backed up to ${backup ?? "(backup failed)"}:`,
-      e
-    );
-    throw new Error(
-      `${filename}.json could not be read and was backed up. Starting from an empty list.`
+    return vt(JSON.parse(n), e);
+  } catch (o) {
+    const s = yt(e);
+    throw console.error(
+      `${e}.json is corrupt and was backed up to ${s ?? "(backup failed)"}:`,
+      o
+    ), new Error(
+      `${e}.json could not be read and was backed up. Starting from an empty list.`
     );
   }
-};
-const writeData = (filename, data) => {
-  const target = dataPath(filename);
-  const temp = `${target}.tmp`;
-  const envelope = { version: SCHEMA_VERSION, data };
+}, Q = (e, t) => {
+  const n = ye(e), o = `${n}.tmp`, s = { version: Ge, data: t };
   try {
-    writeFileSync(temp, JSON.stringify(envelope, null, 2), "utf8");
-    renameSync(temp, target);
-  } catch (e) {
-    console.error(`Error saving ${filename}.json:`, e);
+    lt(o, JSON.stringify(s, null, 2), "utf8"), ut(o, n);
+  } catch (i) {
+    console.error(`Error saving ${e}.json:`, i);
     try {
-      if (existsSync(temp)) unlinkSync(temp);
+      ge(o) && pt(o);
     } catch {
     }
-    throw new Error(`Unable to save ${filename}. Your changes were not written to disk.`);
+    throw new Error(`Unable to save ${e}. Your changes were not written to disk.`);
   }
 };
-function readProjects() {
-  return readData("projects");
+function F() {
+  return ve("projects");
 }
-function writeProjects(projects) {
-  writeData("projects", projects);
+function be(e) {
+  Q("projects", e);
 }
-function generateId(prefix = "id") {
-  const uuid = randomUUID().replace(/-/g, "").slice(0, 12);
-  return `${prefix}_${uuid}`;
+function T(e = "id") {
+  const t = ht().replace(/-/g, "").slice(0, 12);
+  return `${e}_${t}`;
 }
-const MAX_NAME_LENGTH = 80;
-const MAX_COMMAND_LENGTH = 2e3;
-const DESTRUCTIVE_PATTERNS = [
+const Ne = 80, De = 2e3, bt = [
   { pattern: /\brm\s+(-[a-z]*[rf][a-z]*\s+)+/i, reason: "recursively deletes files (rm -rf)" },
   { pattern: /\brmdir\s+\/s\b/i, reason: "recursively deletes a directory (rmdir /s)" },
   { pattern: /\bdel\s+\/[qsf]/i, reason: "force-deletes files (del /f)" },
@@ -105,569 +86,440 @@ const DESTRUCTIVE_PATTERNS = [
   { pattern: /\b(shutdown|reboot)\b/i, reason: "shuts down or restarts the machine" },
   { pattern: />\s*\/dev\/sd[a-z]/i, reason: "writes directly to a block device" }
 ];
-function checkDestructive(command) {
-  for (const { pattern, reason } of DESTRUCTIVE_PATTERNS) {
-    if (pattern.test(command)) {
-      return { destructive: true, reason };
-    }
-  }
-  return { destructive: false };
+function kt(e) {
+  for (const { pattern: t, reason: n } of bt)
+    if (t.test(e))
+      return { destructive: !0, reason: n };
+  return { destructive: !1 };
 }
-function validateCommand(input, projectPath) {
-  const errors = [];
-  const name = (input.name ?? "").trim();
-  const command = (input.command ?? "").trim();
-  const workingDirectory = (input.workingDirectory ?? "").trim();
-  if (!name) {
-    errors.push("Command name is required.");
-  } else if (name.length > MAX_NAME_LENGTH) {
-    errors.push(`Command name must be ${MAX_NAME_LENGTH} characters or fewer.`);
-  }
-  if (!command) {
-    errors.push("Command string is required.");
-  } else if (command.length > MAX_COMMAND_LENGTH) {
-    errors.push(`Command string must be ${MAX_COMMAND_LENGTH} characters or fewer.`);
-  }
-  if (/[\r\n]/.test(command)) {
-    errors.push("Command string cannot span multiple lines.");
-  }
-  if (/\0/.test(command) || /\0/.test(name)) {
-    errors.push("Command contains invalid characters.");
-  }
-  if (workingDirectory) {
-    if (path.isAbsolute(workingDirectory)) {
-      errors.push("Working directory must be relative to the project folder.");
-    } else if (workingDirectory.split(/[/\\]/).includes("..")) {
-      errors.push("Working directory cannot escape the project folder.");
-    } else if (projectPath) {
-      const resolved = path.resolve(projectPath, workingDirectory);
-      if (!resolved.startsWith(path.resolve(projectPath))) {
-        errors.push("Working directory cannot escape the project folder.");
-      } else if (!fs.existsSync(resolved)) {
-        errors.push(`Working directory "${workingDirectory}" does not exist.`);
-      }
+function B(e, t) {
+  const n = [], o = (e.name ?? "").trim(), s = (e.command ?? "").trim(), i = (e.workingDirectory ?? "").trim();
+  if (o ? o.length > Ne && n.push(`Command name must be ${Ne} characters or fewer.`) : n.push("Command name is required."), s ? s.length > De && n.push(`Command string must be ${De} characters or fewer.`) : n.push("Command string is required."), /[\r\n]/.test(s) && n.push("Command string cannot span multiple lines."), (/\0/.test(s) || /\0/.test(o)) && n.push("Command contains invalid characters."), i) {
+    if (d.isAbsolute(i))
+      n.push("Working directory must be relative to the project folder.");
+    else if (i.split(/[/\\]/).includes(".."))
+      n.push("Working directory cannot escape the project folder.");
+    else if (t) {
+      const c = d.resolve(t, i);
+      c.startsWith(d.resolve(t)) ? h.existsSync(c) || n.push(`Working directory "${i}" does not exist.`) : n.push("Working directory cannot escape the project folder.");
     }
   }
-  const { destructive, reason } = checkDestructive(command);
+  const { destructive: r, reason: a } = kt(s);
   return {
-    valid: errors.length === 0,
-    errors,
-    requiresConfirmation: destructive,
-    destructiveReason: reason
+    valid: n.length === 0,
+    errors: n,
+    requiresConfirmation: r,
+    destructiveReason: a
   };
 }
-function resolveWorkingDirectory(projectPath, workingDirectory) {
-  const root = path.resolve(projectPath);
-  if (!workingDirectory || !workingDirectory.trim()) return root;
-  const resolved = path.resolve(root, workingDirectory.trim());
-  if (!resolved.startsWith(root)) {
+function He(e, t) {
+  const n = d.resolve(e);
+  if (!t || !t.trim()) return n;
+  const o = d.resolve(n, t.trim());
+  if (!o.startsWith(n))
     throw new Error("Working directory escapes the project folder.");
-  }
-  if (!fs.existsSync(resolved)) {
-    throw new Error(`Working directory "${workingDirectory}" does not exist.`);
-  }
-  return resolved;
+  if (!h.existsSync(o))
+    throw new Error(`Working directory "${t}" does not exist.`);
+  return o;
 }
-const isWindows = process.platform === "win32";
-const isMac = process.platform === "darwin";
-function fileManagerSpec(absolutePath) {
-  if (isWindows) {
-    return { command: "explorer.exe", args: [absolutePath], detached: true };
-  }
-  if (isMac) {
-    return { command: "open", args: [absolutePath], detached: true };
-  }
-  return { command: "xdg-open", args: [absolutePath], detached: true };
+const q = process.platform === "win32", Je = process.platform === "darwin";
+function St(e) {
+  return q ? { command: "explorer.exe", args: [e], detached: !0 } : Je ? { command: "open", args: [e], detached: !0 } : { command: "xdg-open", args: [e], detached: !0 };
 }
-function terminalSpec(cwd, runCommand2) {
-  if (isWindows) {
-    const inner = runCommand2 ? ["cmd", "/k", runCommand2] : ["cmd", "/k"];
-    return {
-      command: "cmd",
-      args: ["/c", "start", "", ...inner],
-      detached: true
-    };
-  }
-  if (isMac) {
-    if (!runCommand2) {
-      return { command: "open", args: ["-a", "Terminal", cwd], detached: true };
-    }
-    const script = `tell application "Terminal" to do script "cd ${shellQuote(cwd)} && ${runCommand2.replace(/"/g, '\\"')}"`;
-    return { command: "osascript", args: ["-e", script], detached: true };
-  }
-  const args = runCommand2 ? ["-e", `bash -c '${runCommand2.replace(/'/g, "'\\''")}; exec bash'`] : [];
-  return { command: "x-terminal-emulator", args, detached: true };
+function qe(e, t) {
+  return q ? {
+    command: "cmd",
+    args: ["/c", "start", "", ...t ? ["cmd", "/k", t] : ["cmd", "/k"]],
+    detached: !0
+  } : Je ? t ? { command: "osascript", args: ["-e", `tell application "Terminal" to do script "cd ${xt(e)} && ${t.replace(/"/g, '\\"')}"`], detached: !0 } : { command: "open", args: ["-a", "Terminal", e], detached: !0 } : { command: "x-terminal-emulator", args: t ? ["-e", `bash -c '${t.replace(/'/g, "'\\''")}; exec bash'`] : [], detached: !0 };
 }
-const EDITOR_BINARIES = {
+const G = {
   vscode: { bin: "code", label: "VS Code" },
   cursor: { bin: "cursor", label: "Cursor" },
   antigravity: { bin: "agy", label: "Antigravity" }
 };
-function windowsShimSpec(binary, args) {
-  const quote = (value) => value.startsWith("-") ? value : `"${value}"`;
-  const line = [binary, ...args.map(quote)].join(" ");
+function jt(e, t) {
+  const n = (s) => s.startsWith("-") ? s : `"${s}"`;
   return {
     command: "cmd.exe",
-    args: ["/d", "/s", "/c", `"${line}"`],
-    detached: false,
-    verbatim: true
+    args: ["/d", "/s", "/c", `"${[e, ...t.map(n)].join(" ")}"`],
+    detached: !1,
+    verbatim: !0
   };
 }
-function editorSpec(editorKey, absolutePath, newWindow) {
-  const editor = EDITOR_BINARIES[editorKey];
-  if (!editor) return null;
-  const args = editorKey === "vscode" ? [newWindow ? "-n" : "-r", absolutePath] : [absolutePath];
-  if (isWindows) return windowsShimSpec(`${editor.bin}.cmd`, args);
-  return { command: editor.bin, args, detached: false };
+function Et(e, t, n) {
+  const o = G[e];
+  if (!o) return null;
+  const s = e === "vscode" ? [n ? "-n" : "-r", t] : [t];
+  return q ? jt(`${o.bin}.cmd`, s) : { command: o.bin, args: s, detached: !1 };
 }
-function shellQuote(value) {
-  return value.replace(/(["\s'$`\\])/g, "\\$1");
+function xt(e) {
+  return e.replace(/(["\s'$`\\])/g, "\\$1");
 }
-function run(spec, cwd) {
-  return new Promise((resolve, reject) => {
-    var _a;
-    let child;
+function ee(e, t) {
+  return new Promise((n, o) => {
+    var a;
+    let s;
     try {
-      child = spawn(spec.command, spec.args, {
-        cwd,
-        shell: false,
-        detached: spec.detached,
+      s = we(e.command, e.args, {
+        cwd: t,
+        shell: !1,
+        detached: e.detached,
         // Detached windows own their own console. For everything else we keep
         // stderr so a failure can be explained instead of reported as a bare
         // exit code.
-        stdio: spec.detached ? "ignore" : ["ignore", "ignore", "pipe"],
-        windowsHide: false,
-        windowsVerbatimArguments: spec.verbatim ?? false
+        stdio: e.detached ? "ignore" : ["ignore", "ignore", "pipe"],
+        windowsHide: !1,
+        windowsVerbatimArguments: e.verbatim ?? !1
       });
-    } catch (e) {
-      reject(e);
+    } catch (c) {
+      o(c);
       return;
     }
-    let settled = false;
-    let stderr = "";
-    (_a = child.stderr) == null ? void 0 : _a.on("data", (chunk) => {
-      stderr = (stderr + chunk.toString()).slice(-2e3);
-    });
-    child.on("error", (err) => {
-      if (settled) return;
-      settled = true;
-      reject(
-        err.code === "ENOENT" ? new Error(`"${spec.command}" was not found on your PATH.`) : err
-      );
-    });
-    if (spec.detached) {
-      child.unref();
-      setTimeout(() => {
-        if (settled) return;
-        settled = true;
-        resolve({ ok: true, detached: true });
+    let i = !1, r = "";
+    if ((a = s.stderr) == null || a.on("data", (c) => {
+      r = (r + c.toString()).slice(-2e3);
+    }), s.on("error", (c) => {
+      i || (i = !0, o(
+        c.code === "ENOENT" ? new Error(`"${e.command}" was not found on your PATH.`) : c
+      ));
+    }), e.detached) {
+      s.unref(), setTimeout(() => {
+        i || (i = !0, n({ ok: !0, detached: !0 }));
       }, 100);
       return;
     }
-    child.on("close", (code) => {
-      if (settled) return;
-      settled = true;
-      if (code === 0 || code === null) {
-        resolve({ ok: true, detached: false });
+    s.on("close", (c) => {
+      if (i) return;
+      if (i = !0, c === 0 || c === null) {
+        n({ ok: !0, detached: !1 });
         return;
       }
-      const detail = stderr.trim().split(/\r?\n/).filter(Boolean).slice(-2).join(" ");
-      reject(new Error(detail || `"${spec.command}" exited with code ${code}.`));
+      const l = r.trim().split(/\r?\n/).filter(Boolean).slice(-2).join(" ");
+      o(new Error(l || `"${e.command}" exited with code ${c}.`));
     });
   });
 }
-function assertDirectory(projectPath) {
-  const absolutePath = path.resolve(projectPath);
-  if (!fs.existsSync(absolutePath)) {
-    throw new Error(`The folder "${absolutePath}" no longer exists.`);
-  }
-  return absolutePath;
+function te(e) {
+  const t = d.resolve(e);
+  if (!h.existsSync(t))
+    throw new Error(`The folder "${t}" no longer exists.`);
+  return t;
 }
-async function openInEditor(editorKey, projectPath, newWindow = false) {
-  var _a;
-  const absolutePath = assertDirectory(projectPath);
-  const spec = editorSpec(editorKey, absolutePath, newWindow);
-  if (!spec) {
-    throw new Error(`Unknown editor "${editorKey}".`);
-  }
+async function ke(e, t, n = !1) {
+  var i;
+  const o = te(t), s = Et(e, o, n);
+  if (!s)
+    throw new Error(`Unknown editor "${e}".`);
   try {
-    return await run(spec, absolutePath);
-  } catch (e) {
-    const label = ((_a = EDITOR_BINARIES[editorKey]) == null ? void 0 : _a.label) ?? editorKey;
-    const message = e instanceof Error ? e.message : String(e);
-    const notFound = message.includes("was not found on your PATH") || message.includes("exited with code 9009") || /is not recognized as an internal or external command/i.test(message) || /command not found/i.test(message);
-    if (notFound) {
-      throw new Error(
-        `${label} was not detected. Make sure its command-line launcher is installed and on your PATH.`
-      );
-    }
-    throw new Error(`Could not open ${label}: ${message}`);
+    return await ee(s, o);
+  } catch (r) {
+    const a = ((i = G[e]) == null ? void 0 : i.label) ?? e, c = r instanceof Error ? r.message : String(r);
+    throw c.includes("was not found on your PATH") || c.includes("exited with code 9009") || /is not recognized as an internal or external command/i.test(c) || /command not found/i.test(c) ? new Error(
+      `${a} was not detected. Make sure its command-line launcher is installed and on your PATH.`
+    ) : new Error(`Could not open ${a}: ${c}`);
   }
 }
-async function openTerminal(projectPath) {
-  const absolutePath = assertDirectory(projectPath);
-  return run(terminalSpec(absolutePath), absolutePath);
+async function Ze(e) {
+  const t = te(e);
+  return ee(qe(t), t);
 }
-async function openInExplorer(projectPath) {
-  const absolutePath = assertDirectory(projectPath);
-  return run(fileManagerSpec(absolutePath), absolutePath);
+async function Ke(e) {
+  const t = te(e);
+  return ee(St(t), t);
 }
-async function runCommandInTerminal(commandString, cwd) {
-  const absolutePath = assertDirectory(cwd);
-  return run(terminalSpec(absolutePath, commandString), absolutePath);
+async function ne(e, t) {
+  const n = te(t);
+  return ee(qe(n, e), n);
 }
-function readSessions() {
-  return readData("sessions");
+function oe() {
+  return ve("sessions");
 }
-function writeSessions(sessions) {
-  writeData("sessions", sessions);
+function Ye(e) {
+  Q("sessions", e);
 }
-const DEFAULT_DELAY_MS = 800;
-const MAX_DELAY_MS = 6e4;
-const MAX_STEPS$1 = 30;
-function emptySession(projectId) {
+const Ct = 800, Xe = 6e4, Qe = 30;
+function At(e) {
   return {
-    projectId,
+    projectId: e,
     steps: [],
     capturedAt: Date.now(),
-    autoCapture: true
+    autoCapture: !0
   };
 }
-function getSession(projectId) {
-  return readSessions().find((s) => s.projectId === projectId) ?? emptySession(projectId);
+function Z(e) {
+  return oe().find((t) => t.projectId === e) ?? At(e);
 }
-function getAllSessions() {
-  return readSessions();
+function $t() {
+  return oe();
 }
-function saveSession(session) {
-  const sessions = readSessions();
-  const index = sessions.findIndex((s) => s.projectId === session.projectId);
-  const normalized = {
-    ...session,
-    steps: session.steps.slice(0, MAX_STEPS$1).map((step, i) => ({ ...step, sortOrder: i }))
+function se(e) {
+  const t = oe(), n = t.findIndex((s) => s.projectId === e.projectId), o = {
+    ...e,
+    steps: e.steps.slice(0, Qe).map((s, i) => ({ ...s, sortOrder: i }))
   };
-  if (index === -1) sessions.push(normalized);
-  else sessions[index] = normalized;
-  writeSessions(sessions);
-  return normalized;
+  return n === -1 ? t.push(o) : t[n] = o, Ye(t), o;
 }
-function captureStep(projectId, kind, target, label) {
-  const session = getSession(projectId);
-  if (!session.autoCapture) return;
-  const existingIndex = session.steps.findIndex(
-    (step) => kind === "editor" ? step.kind === "editor" : step.kind === kind && step.target === target
+function le(e, t, n, o) {
+  const s = Z(e);
+  if (!s.autoCapture) return;
+  const i = s.steps.findIndex(
+    (r) => t === "editor" ? r.kind === "editor" : r.kind === t && r.target === n
   );
-  if (existingIndex !== -1) {
-    session.steps[existingIndex] = {
-      ...session.steps[existingIndex],
-      target,
-      label
+  if (i !== -1)
+    s.steps[i] = {
+      ...s.steps[i],
+      target: n,
+      label: o
     };
-  } else {
-    if (session.steps.length >= MAX_STEPS$1) return;
-    session.steps.push({
-      id: generateId("step"),
-      kind,
-      target,
-      label,
-      delayMs: DEFAULT_DELAY_MS,
-      enabled: true,
-      sortOrder: session.steps.length
+  else {
+    if (s.steps.length >= Qe) return;
+    s.steps.push({
+      id: T("step"),
+      kind: t,
+      target: n,
+      label: o,
+      delayMs: Ct,
+      enabled: !0,
+      sortOrder: s.steps.length
     });
   }
-  session.capturedAt = Date.now();
-  saveSession(session);
+  s.capturedAt = Date.now(), se(s);
 }
-function updateSession(projectId, updates) {
-  const session = getSession(projectId);
-  if (updates.autoCapture !== void 0) {
-    session.autoCapture = updates.autoCapture;
-  }
-  if (updates.steps) {
-    session.steps = updates.steps.map((step, i) => ({
-      id: step.id || generateId("step"),
-      kind: step.kind,
-      target: String(step.target ?? ""),
-      label: String(step.label ?? "").slice(0, 120),
-      delayMs: Math.min(Math.max(Number(step.delayMs) || 0, 0), MAX_DELAY_MS),
-      enabled: step.enabled !== false,
-      sortOrder: i
-    }));
-  }
-  return saveSession(session);
+function Pt(e, t) {
+  const n = Z(e);
+  return t.autoCapture !== void 0 && (n.autoCapture = t.autoCapture), t.steps && (n.steps = t.steps.map((o, s) => ({
+    id: o.id || T("step"),
+    kind: o.kind,
+    target: String(o.target ?? ""),
+    label: String(o.label ?? "").slice(0, 120),
+    delayMs: Math.min(Math.max(Number(o.delayMs) || 0, 0), Xe),
+    enabled: o.enabled !== !1,
+    sortOrder: s
+  }))), se(n);
 }
-function clearSession(projectId) {
-  const session = getSession(projectId);
-  session.steps = [];
-  session.capturedAt = Date.now();
-  return saveSession(session);
+function Nt(e) {
+  const t = Z(e);
+  return t.steps = [], t.capturedAt = Date.now(), se(t);
 }
-const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-async function resumeSession(projectId, onProgress) {
-  const project = readProjects().find((p) => p.id === projectId);
-  if (!project) throw new Error("Project not found.");
-  if (!fs.existsSync(project.path)) {
-    throw new Error(`The folder "${project.path}" no longer exists.`);
-  }
-  const session = getSession(projectId);
-  const ordered = [...session.steps].sort((a, b) => a.sortOrder - b.sortOrder);
-  if (ordered.length === 0) {
+const Dt = (e) => new Promise((t) => setTimeout(t, e));
+async function Tt(e, t) {
+  const n = F().find((r) => r.id === e);
+  if (!n) throw new Error("Project not found.");
+  if (!h.existsSync(n.path))
+    throw new Error(`The folder "${n.path}" no longer exists.`);
+  const o = Z(e), s = [...o.steps].sort((r, a) => r.sortOrder - a.sortOrder);
+  if (s.length === 0)
     throw new Error(
       "This project has no saved session yet. Open it and run a command, then try again."
     );
-  }
-  const results = [];
-  for (let i = 0; i < ordered.length; i += 1) {
-    const step = ordered[i];
-    onProgress == null ? void 0 : onProgress({
-      projectId,
-      current: i + 1,
-      total: ordered.length,
-      label: step.label,
-      done: false
-    });
-    if (!step.enabled) {
-      results.push({ stepId: step.id, label: step.label, kind: step.kind, status: "skipped" });
+  const i = [];
+  for (let r = 0; r < s.length; r += 1) {
+    const a = s[r];
+    if (t == null || t({
+      projectId: e,
+      current: r + 1,
+      total: s.length,
+      label: a.label,
+      done: !1
+    }), !a.enabled) {
+      i.push({ stepId: a.id, label: a.label, kind: a.kind, status: "skipped" });
       continue;
     }
     try {
-      await runStep(project, step);
-      results.push({ stepId: step.id, label: step.label, kind: step.kind, status: "ok" });
-    } catch (e) {
-      results.push({
-        stepId: step.id,
-        label: step.label,
-        kind: step.kind,
+      await Rt(n, a), i.push({ stepId: a.id, label: a.label, kind: a.kind, status: "ok" });
+    } catch (c) {
+      i.push({
+        stepId: a.id,
+        label: a.label,
+        kind: a.kind,
         status: "failed",
-        error: e instanceof Error ? e.message : String(e)
+        error: c instanceof Error ? c.message : String(c)
       });
     }
-    if (step.delayMs > 0 && i < ordered.length - 1) {
-      await delay(Math.min(step.delayMs, MAX_DELAY_MS));
-    }
+    a.delayMs > 0 && r < s.length - 1 && await Dt(Math.min(a.delayMs, Xe));
   }
-  onProgress == null ? void 0 : onProgress({
-    projectId,
-    current: ordered.length,
-    total: ordered.length,
+  return t == null || t({
+    projectId: e,
+    current: s.length,
+    total: s.length,
     label: "",
-    done: true
-  });
-  session.lastResumedAt = Date.now();
-  saveSession(session);
-  return {
-    projectId,
-    projectName: project.name,
-    steps: results,
-    succeeded: results.filter((r) => r.status === "ok").length,
-    failed: results.filter((r) => r.status === "failed").length,
-    skipped: results.filter((r) => r.status === "skipped").length
+    done: !0
+  }), o.lastResumedAt = Date.now(), se(o), {
+    projectId: e,
+    projectName: n.name,
+    steps: i,
+    succeeded: i.filter((r) => r.status === "ok").length,
+    failed: i.filter((r) => r.status === "failed").length,
+    skipped: i.filter((r) => r.status === "skipped").length
   };
 }
-async function runStep(project, step) {
-  switch (step.kind) {
+async function Rt(e, t) {
+  switch (t.kind) {
     case "editor": {
-      const editorKey = EDITOR_BINARIES[step.target] ? step.target : "vscode";
-      await openInEditor(editorKey, project.path, false);
+      const n = G[t.target] ? t.target : "vscode";
+      await ke(n, e.path, !1);
       return;
     }
     case "terminal":
-      await openTerminal(project.path);
+      await Ze(e.path);
       return;
     case "folder":
-      await openInExplorer(project.path);
+      await Ke(e.path);
       return;
     case "command": {
-      const command = (project.commands ?? []).find((c) => c.id === step.target);
-      if (!command) {
+      const n = (e.commands ?? []).find((i) => i.id === t.target);
+      if (!n)
         throw new Error("That command has been deleted.");
-      }
-      const check = validateCommand(
+      const o = B(
         {
-          name: command.name,
-          command: command.command,
-          workingDirectory: command.workingDirectory
+          name: n.name,
+          command: n.command,
+          workingDirectory: n.workingDirectory
         },
-        project.path
+        e.path
       );
-      if (!check.valid) throw new Error(check.errors.join(" "));
-      if (check.requiresConfirmation) {
+      if (!o.valid) throw new Error(o.errors.join(" "));
+      if (o.requiresConfirmation)
         throw new Error(
-          `Skipped because it ${check.destructiveReason}. Run it manually if you meant to.`
+          `Skipped because it ${o.destructiveReason}. Run it manually if you meant to.`
         );
-      }
-      const cwd = resolveWorkingDirectory(project.path, command.workingDirectory);
-      await runCommandInTerminal(command.command, cwd);
+      const s = He(e.path, n.workingDirectory);
+      await ne(n.command, s);
       return;
     }
     case "url":
       throw new Error("URL steps are not supported yet.");
     default:
-      throw new Error(`Unknown step type "${step.kind}".`);
+      throw new Error(`Unknown step type "${t.kind}".`);
   }
 }
-function pruneSessions() {
-  const projectIds = new Set(readProjects().map((p) => p.id));
-  const sessions = readSessions();
-  const kept = sessions.filter((s) => projectIds.has(s.projectId));
-  if (kept.length !== sessions.length) writeSessions(kept);
+function It() {
+  const e = new Set(F().map((o) => o.id)), t = oe(), n = t.filter((o) => e.has(o.projectId));
+  n.length !== t.length && Ye(n);
 }
-function getProjects() {
-  return readProjects();
+function L() {
+  return F();
 }
-function getProject(id) {
-  return readProjects().find((project) => project.id === id);
+function ue(e) {
+  return F().find((t) => t.id === e);
 }
-function addProject(projectData) {
-  const projects = readProjects();
-  const newProject = {
-    ...projectData,
-    id: projectData.id || generateId("proj"),
-    tags: projectData.tags || [],
-    commands: projectData.commands || [],
-    isFavorite: projectData.isFavorite ?? false,
-    createdAt: projectData.createdAt || Date.now(),
-    updatedAt: projectData.updatedAt || Date.now()
+function Se(e) {
+  const t = F(), n = {
+    ...e,
+    id: e.id || T("proj"),
+    tags: e.tags || [],
+    commands: e.commands || [],
+    isFavorite: e.isFavorite ?? !1,
+    createdAt: e.createdAt || Date.now(),
+    updatedAt: e.updatedAt || Date.now()
   };
-  projects.push(newProject);
-  writeProjects(projects);
-  return newProject;
+  return t.push(n), be(t), n;
 }
-function updateProject(id, updates) {
-  const projects = readProjects();
-  const index = projects.findIndex((project) => project.id === id);
-  if (index === -1) return void 0;
-  const safeUpdates = { ...updates };
-  delete safeUpdates.id;
-  delete safeUpdates.createdAt;
-  const updatedProject = {
-    ...projects[index],
-    ...safeUpdates,
+function V(e, t) {
+  const n = F(), o = n.findIndex((r) => r.id === e);
+  if (o === -1) return;
+  const s = { ...t };
+  delete s.id, delete s.createdAt;
+  const i = {
+    ...n[o],
+    ...s,
     updatedAt: Date.now()
   };
-  projects[index] = updatedProject;
-  writeProjects(projects);
-  return updatedProject;
+  return n[o] = i, be(n), i;
 }
-function deleteProject(id) {
-  const projects = readProjects();
-  const filteredProjects = projects.filter((project) => project.id !== id);
-  if (filteredProjects.length === projects.length) return false;
-  writeProjects(filteredProjects);
-  return true;
+function _t(e) {
+  const t = F(), n = t.filter((o) => o.id !== e);
+  return n.length === t.length ? !1 : (be(n), !0);
 }
-function seedProjectCommands(projectId, commands) {
-  const project = requireProject(projectId);
-  if (project.commands && project.commands.length > 0) return project;
-  const now = Date.now();
-  const seeded = commands.map((cmd) => ({
-    ...cmd,
-    id: cmd.id || generateId("cmd"),
-    projectId,
-    isFavorite: cmd.isFavorite ?? false,
-    createdAt: cmd.createdAt || now,
-    updatedAt: now
+function Ot(e, t) {
+  const n = z(e);
+  if (n.commands && n.commands.length > 0) return n;
+  const o = Date.now(), s = t.map((i) => ({
+    ...i,
+    id: i.id || T("cmd"),
+    projectId: e,
+    isFavorite: i.isFavorite ?? !1,
+    createdAt: i.createdAt || o,
+    updatedAt: o
   }));
-  return updateProject(projectId, { commands: seeded });
+  return V(e, { commands: s });
 }
-function addProjectCommand(projectId, input) {
-  var _a, _b;
-  const project = requireProject(projectId);
-  const result = validateCommand(
-    { name: input.name, command: input.command, workingDirectory: input.workingDirectory },
-    project.path
+function Mt(e, t) {
+  var c, l;
+  const n = z(e), o = B(
+    { name: t.name, command: t.command, workingDirectory: t.workingDirectory },
+    n.path
   );
-  if (!result.valid) {
-    throw new Error(result.errors.join(" "));
-  }
-  const now = Date.now();
-  const command = {
-    id: generateId("cmd"),
-    projectId,
-    name: (input.name ?? "").trim(),
-    command: (input.command ?? "").trim(),
-    description: ((_a = input.description) == null ? void 0 : _a.trim()) || void 0,
-    workingDirectory: ((_b = input.workingDirectory) == null ? void 0 : _b.trim()) || void 0,
-    shell: input.shell,
-    isFavorite: input.isFavorite ?? false,
-    createdAt: now,
-    updatedAt: now
-  };
-  const commands = [...project.commands ?? [], command];
-  const updated = updateProject(projectId, { commands });
-  return { project: updated, command };
+  if (!o.valid)
+    throw new Error(o.errors.join(" "));
+  const s = Date.now(), i = {
+    id: T("cmd"),
+    projectId: e,
+    name: (t.name ?? "").trim(),
+    command: (t.command ?? "").trim(),
+    description: ((c = t.description) == null ? void 0 : c.trim()) || void 0,
+    workingDirectory: ((l = t.workingDirectory) == null ? void 0 : l.trim()) || void 0,
+    shell: t.shell,
+    isFavorite: t.isFavorite ?? !1,
+    createdAt: s,
+    updatedAt: s
+  }, r = [...n.commands ?? [], i];
+  return { project: V(e, { commands: r }), command: i };
 }
-function updateProjectCommand(projectId, commandId, updates) {
-  const project = requireProject(projectId);
-  const commands = project.commands ?? [];
-  const index = commands.findIndex((c) => c.id === commandId);
-  if (index === -1) {
+function Ft(e, t, n) {
+  const o = z(e), s = o.commands ?? [], i = s.findIndex((u) => u.id === t);
+  if (i === -1)
     throw new Error("Command not found.");
-  }
-  const merged = {
-    ...commands[index],
-    ...updates,
-    id: commands[index].id,
-    projectId,
-    createdAt: commands[index].createdAt,
+  const r = {
+    ...s[i],
+    ...n,
+    id: s[i].id,
+    projectId: e,
+    createdAt: s[i].createdAt,
     updatedAt: Date.now()
   };
-  const touchesExecution = updates.name !== void 0 || updates.command !== void 0 || updates.workingDirectory !== void 0;
-  if (touchesExecution) {
-    const result = validateCommand(
-      { name: merged.name, command: merged.command, workingDirectory: merged.workingDirectory },
-      project.path
+  if (n.name !== void 0 || n.command !== void 0 || n.workingDirectory !== void 0) {
+    const u = B(
+      { name: r.name, command: r.command, workingDirectory: r.workingDirectory },
+      o.path
     );
-    if (!result.valid) {
-      throw new Error(result.errors.join(" "));
-    }
+    if (!u.valid)
+      throw new Error(u.errors.join(" "));
   }
-  const next = [...commands];
-  next[index] = merged;
-  const updated = updateProject(projectId, { commands: next });
-  return { project: updated, command: merged };
+  const c = [...s];
+  return c[i] = r, { project: V(e, { commands: c }), command: r };
 }
-function deleteProjectCommand(projectId, commandId) {
-  const project = requireProject(projectId);
-  const commands = project.commands ?? [];
-  const next = commands.filter((c) => c.id !== commandId);
-  if (next.length === commands.length) {
+function Lt(e, t) {
+  const o = z(e).commands ?? [], s = o.filter((i) => i.id !== t);
+  if (s.length === o.length)
     throw new Error("Command not found.");
-  }
-  return updateProject(projectId, { commands: next });
+  return V(e, { commands: s });
 }
-async function runProjectCommand(projectId, commandId, confirmedDestructive = false) {
-  const project = requireProject(projectId);
-  const command = (project.commands ?? []).find((c) => c.id === commandId);
-  if (!command) {
+async function Vt(e, t, n = !1) {
+  const o = z(e), s = (o.commands ?? []).find((p) => p.id === t);
+  if (!s)
     throw new Error("Command not found. It may have been deleted.");
-  }
-  if (!fs.existsSync(project.path)) {
-    throw new Error(`The folder "${project.path}" no longer exists.`);
-  }
-  const check = validateCommand(
-    { name: command.name, command: command.command, workingDirectory: command.workingDirectory },
-    project.path
+  if (!h.existsSync(o.path))
+    throw new Error(`The folder "${o.path}" no longer exists.`);
+  const i = B(
+    { name: s.name, command: s.command, workingDirectory: s.workingDirectory },
+    o.path
   );
-  if (!check.valid) {
-    throw new Error(check.errors.join(" "));
-  }
-  if (check.requiresConfirmation && !confirmedDestructive) {
+  if (!i.valid)
+    throw new Error(i.errors.join(" "));
+  if (i.requiresConfirmation && !n)
     throw new Error(
-      `"${command.name}" ${check.destructiveReason}. It was not run because it has not been confirmed.`
+      `"${s.name}" ${i.destructiveReason}. It was not run because it has not been confirmed.`
     );
-  }
-  const cwd = resolveWorkingDirectory(project.path, command.workingDirectory);
-  const result = await runCommandInTerminal(command.command, cwd);
-  captureStep(projectId, "command", command.id, command.name);
-  const now = Date.now();
-  const commands = (project.commands ?? []).map(
-    (c) => c.id === commandId ? { ...c, lastRunAt: now } : c
+  const r = He(o.path, s.workingDirectory), a = await ne(s.command, r);
+  le(e, "command", s.id, s.name);
+  const c = Date.now(), l = (o.commands ?? []).map(
+    (p) => p.id === t ? { ...p, lastRunAt: c } : p
   );
-  const updated = updateProject(projectId, { commands, lastCommandAt: now });
-  return { project: updated, result };
+  return { project: V(e, { commands: l, lastCommandAt: c }), result: a };
 }
-const EDITOR_ACTIONS = {
+const Wt = {
   "open-in-vscode": "vscode",
   vscode: "vscode",
   "open-in-cursor": "cursor",
@@ -675,783 +527,561 @@ const EDITOR_ACTIONS = {
   "open-in-antigravity": "antigravity",
   antigravity: "antigravity"
 };
-async function launchProject(id, action, newWindow = false) {
-  var _a;
-  const project = requireProject(id);
-  const normalized = action.toLowerCase();
-  if (!fs.existsSync(project.path)) {
-    throw new Error(`The folder "${project.path}" no longer exists.`);
-  }
-  let result;
-  const editorKey = EDITOR_ACTIONS[normalized];
-  if (editorKey) {
-    result = await openInEditor(editorKey, project.path, newWindow);
-    captureStep(id, "editor", editorKey, `Open in ${((_a = EDITOR_BINARIES[editorKey]) == null ? void 0 : _a.label) ?? editorKey}`);
-  } else if (normalized === "terminal" || normalized === "open-in-terminal") {
-    result = await openTerminal(project.path);
-    captureStep(id, "terminal", "", "Open terminal");
-  } else {
-    result = await openInExplorer(project.path);
-  }
-  const updated = updateProject(id, { lastOpenedAt: Date.now() });
-  return { project: updated, result };
+async function Ut(e, t, n = !1) {
+  var c;
+  const o = z(e), s = t.toLowerCase();
+  if (!h.existsSync(o.path))
+    throw new Error(`The folder "${o.path}" no longer exists.`);
+  let i;
+  const r = Wt[s];
+  return r ? (i = await ke(r, o.path, n), le(e, "editor", r, `Open in ${((c = G[r]) == null ? void 0 : c.label) ?? r}`)) : s === "terminal" || s === "open-in-terminal" ? (i = await Ze(o.path), le(e, "terminal", "", "Open terminal")) : i = await Ke(o.path), { project: V(e, { lastOpenedAt: Date.now() }), result: i };
 }
-function requireProject(id) {
-  const project = getProject(id);
-  if (!project) {
+function z(e) {
+  const t = ue(e);
+  if (!t)
     throw new Error("Project not found.");
-  }
-  return project;
+  return t;
 }
-function fallbackCommand(folderPath) {
-  const has = (relative) => fs.existsSync(path$1.join(folderPath, relative));
-  if (has("Cargo.toml")) {
-    return { name: "Run", command: "cargo run", description: "Build and run the crate" };
-  }
-  if (has("go.mod")) {
-    return { name: "Run", command: "go run .", description: "Build and run the module" };
-  }
-  if (has("manage.py")) {
-    return {
-      name: "Start Dev Server",
-      command: "python manage.py runserver",
-      description: "Start the Django development server"
-    };
-  }
-  if (has("requirements.txt") || has("pyproject.toml") || has("Pipfile")) {
-    return { name: "Run", command: "python main.py", description: "Run the entry point" };
-  }
-  if (has("pom.xml")) {
-    return { name: "Run", command: "mvn spring-boot:run", description: "Run via Maven" };
-  }
-  if (has("build.gradle") || has("build.gradle.kts")) {
-    return { name: "Run", command: "gradle run", description: "Run via Gradle" };
-  }
-  if (has("docker-compose.yml") || has("docker-compose.yaml") || has("compose.yml")) {
-    return {
-      name: "Compose Up",
-      command: "docker compose up",
-      description: "Start the Compose stack"
-    };
-  }
-  if (has("Makefile")) {
-    return { name: "Make", command: "make", description: "Run the default make target" };
-  }
-  return null;
+function Bt(e) {
+  const t = (n) => h.existsSync(H.join(e, n));
+  return t("Cargo.toml") ? { name: "Run", command: "cargo run", description: "Build and run the crate" } : t("go.mod") ? { name: "Run", command: "go run .", description: "Build and run the module" } : t("manage.py") ? {
+    name: "Start Dev Server",
+    command: "python manage.py runserver",
+    description: "Start the Django development server"
+  } : t("requirements.txt") || t("pyproject.toml") || t("Pipfile") ? { name: "Run", command: "python main.py", description: "Run the entry point" } : t("pom.xml") ? { name: "Run", command: "mvn spring-boot:run", description: "Run via Maven" } : t("build.gradle") || t("build.gradle.kts") ? { name: "Run", command: "gradle run", description: "Run via Gradle" } : t("docker-compose.yml") || t("docker-compose.yaml") || t("compose.yml") ? {
+    name: "Compose Up",
+    command: "docker compose up",
+    description: "Start the Compose stack"
+  } : t("Makefile") ? { name: "Make", command: "make", description: "Run the default make target" } : null;
 }
-function stableCommandId(folderPath, name, command) {
-  const digest = createHash("sha1").update(`${path$1.resolve(folderPath)}::${name}::${command}`).digest("hex").slice(0, 12);
-  return `cmd_${digest}`;
+function Te(e, t, n) {
+  return `cmd_${gt("sha1").update(`${H.resolve(e)}::${t}::${n}`).digest("hex").slice(0, 12)}`;
 }
-function detectProjectMeta(folderPath) {
-  const folderName = path$1.basename(folderPath) || "New Project";
-  const tagsSet = /* @__PURE__ */ new Set();
-  const languages = [];
-  const frameworks = [];
-  const commands = [];
-  let packageManager = void 0;
-  let description = void 0;
-  if (!folderPath || !fs.existsSync(folderPath)) {
+function je(e) {
+  const t = H.basename(e) || "New Project", n = /* @__PURE__ */ new Set(), o = [], s = [], i = [];
+  let r, a;
+  if (!e || !h.existsSync(e))
     return {
-      name: folderName,
+      name: t,
       tags: [],
       commands: [],
       details: {
         languages: [],
         frameworks: [],
-        hasGit: false,
-        hasDocker: false
+        hasGit: !1,
+        hasDocker: !1
       }
     };
-  }
-  const exists = (relativePath) => fs.existsSync(path$1.join(folderPath, relativePath));
-  const hasGit = exists(".git");
-  if (hasGit) tagsSet.add("Git");
-  const hasDocker = exists("Dockerfile") || exists("docker-compose.yml") || exists("docker-compose.yaml");
-  if (hasDocker) tagsSet.add("Docker");
-  let pmPrefix = "npm run";
-  if (exists("pnpm-lock.yaml")) {
-    packageManager = "pnpm";
-    pmPrefix = "pnpm";
-    tagsSet.add("pnpm");
-  } else if (exists("yarn.lock")) {
-    packageManager = "yarn";
-    pmPrefix = "yarn";
-    tagsSet.add("yarn");
-  } else if (exists("bun.lockb") || exists("bun.lock")) {
-    packageManager = "bun";
-    pmPrefix = "bun run";
-    tagsSet.add("bun");
-  } else if (exists("package-lock.json")) {
-    packageManager = "npm";
-    pmPrefix = "npm run";
-    tagsSet.add("npm");
-  }
-  const packageJsonPath = path$1.join(folderPath, "package.json");
-  if (fs.existsSync(packageJsonPath)) {
+  const c = (g) => h.existsSync(H.join(e, g)), l = c(".git");
+  l && n.add("Git");
+  const u = c("Dockerfile") || c("docker-compose.yml") || c("docker-compose.yaml");
+  u && n.add("Docker");
+  let p = "npm run";
+  c("pnpm-lock.yaml") ? (r = "pnpm", p = "pnpm", n.add("pnpm")) : c("yarn.lock") ? (r = "yarn", p = "yarn", n.add("yarn")) : c("bun.lockb") || c("bun.lock") ? (r = "bun", p = "bun run", n.add("bun")) : c("package-lock.json") && (r = "npm", p = "npm run", n.add("npm"));
+  const w = H.join(e, "package.json");
+  if (h.existsSync(w))
     try {
-      const content = JSON.parse(fs.readFileSync(packageJsonPath, "utf-8"));
-      if (content.description) {
-        description = content.description;
-      }
-      const allDeps = {
-        ...content.dependencies || {},
-        ...content.devDependencies || {}
+      const g = JSON.parse(h.readFileSync(w, "utf-8"));
+      g.description && (a = g.description);
+      const m = {
+        ...g.dependencies || {},
+        ...g.devDependencies || {}
       };
-      if (allDeps["typescript"] || exists("tsconfig.json")) {
-        languages.push("TypeScript");
-        tagsSet.add("TypeScript");
-      } else {
-        languages.push("JavaScript");
-        tagsSet.add("JavaScript");
-      }
-      if (allDeps["next"]) {
-        frameworks.push("Next.js");
-        tagsSet.add("Next.js");
-      } else if (allDeps["react"]) {
-        frameworks.push("React");
-        tagsSet.add("React");
-      } else if (allDeps["vue"]) {
-        frameworks.push("Vue");
-        tagsSet.add("Vue");
-      } else if (allDeps["@angular/core"]) {
-        frameworks.push("Angular");
-        tagsSet.add("Angular");
-      } else if (allDeps["svelte"]) {
-        frameworks.push("Svelte");
-        tagsSet.add("Svelte");
-      }
-      if (allDeps["vite"] || exists("vite.config.ts") || exists("vite.config.js")) {
-        frameworks.push("Vite");
-        tagsSet.add("Vite");
-      }
-      if (allDeps["express"]) {
-        frameworks.push("Express");
-        tagsSet.add("Express");
-      }
-      if (allDeps["electron"]) {
-        frameworks.push("Electron");
-        tagsSet.add("Electron");
-      }
-      if (!packageManager) {
-        packageManager = "npm";
-        tagsSet.add("npm");
-      }
-      if (content.scripts && typeof content.scripts === "object") {
-        const scripts = content.scripts;
-        const now = Date.now();
-        const addCommand = (name, command, description2, isFavorite) => {
-          commands.push({
-            id: stableCommandId(folderPath, name, command),
-            name,
-            command,
-            description: description2,
-            isFavorite,
-            createdAt: now,
-            updatedAt: now
+      if (m.typescript || c("tsconfig.json") ? (o.push("TypeScript"), n.add("TypeScript")) : (o.push("JavaScript"), n.add("JavaScript")), m.next ? (s.push("Next.js"), n.add("Next.js")) : m.react ? (s.push("React"), n.add("React")) : m.vue ? (s.push("Vue"), n.add("Vue")) : m["@angular/core"] ? (s.push("Angular"), n.add("Angular")) : m.svelte && (s.push("Svelte"), n.add("Svelte")), (m.vite || c("vite.config.ts") || c("vite.config.js")) && (s.push("Vite"), n.add("Vite")), m.express && (s.push("Express"), n.add("Express")), m.electron && (s.push("Electron"), n.add("Electron")), r || (r = "npm", n.add("npm")), g.scripts && typeof g.scripts == "object") {
+        const v = g.scripts, A = Date.now(), b = (x, Y, re, ie) => {
+          i.push({
+            id: Te(e, x, Y),
+            name: x,
+            command: Y,
+            description: re,
+            isFavorite: ie,
+            createdAt: A,
+            updatedAt: A
           });
-        };
-        const known = [
-          ["dev", "Start Dev Server", "Launch local development server", true],
-          ["start", "Start Application", "Start application process", !scripts.dev],
-          ["build", "Build Production Bundle", "Compile production distribution assets", false],
-          ["test", "Run Test Suite", "Execute test scripts", false],
-          ["lint", "Lint & Format", "Run code linter", false],
-          ["typecheck", "Type Check", "Run the TypeScript compiler", false],
-          ["preview", "Preview Build", "Serve the production build locally", false]
+        }, $ = [
+          ["dev", "Start Dev Server", "Launch local development server", !0],
+          ["start", "Start Application", "Start application process", !v.dev],
+          ["build", "Build Production Bundle", "Compile production distribution assets", !1],
+          ["test", "Run Test Suite", "Execute test scripts", !1],
+          ["lint", "Lint & Format", "Run code linter", !1],
+          ["typecheck", "Type Check", "Run the TypeScript compiler", !1],
+          ["preview", "Preview Build", "Serve the production build locally", !1]
         ];
-        for (const [script, label, description2, isFavorite] of known) {
-          if (scripts[script]) {
-            addCommand(label, `${pmPrefix} ${script}`, description2, isFavorite);
-          }
-        }
-        const claimed = new Set(known.map(([script]) => script));
-        for (const script of Object.keys(scripts)) {
-          if (claimed.has(script)) continue;
-          if (script.startsWith("pre") || script.startsWith("post")) continue;
-          addCommand(script, `${pmPrefix} ${script}`, `Run the "${script}" script`, false);
-        }
+        for (const [x, Y, re, ie] of $)
+          v[x] && b(Y, `${p} ${x}`, re, ie);
+        const P = new Set($.map(([x]) => x));
+        for (const x of Object.keys(v))
+          P.has(x) || x.startsWith("pre") || x.startsWith("post") || b(x, `${p} ${x}`, `Run the "${x}" script`, !1);
       }
-    } catch (e) {
-      console.warn(`Could not parse package.json in ${folderPath}:`, e);
+    } catch (g) {
+      console.warn(`Could not parse package.json in ${e}:`, g);
     }
+  if (i.length === 0) {
+    const g = Date.now(), m = Bt(e);
+    m && i.push({
+      id: Te(e, m.name, m.command),
+      ...m,
+      isFavorite: !0,
+      createdAt: g,
+      updatedAt: g
+    });
   }
-  if (commands.length === 0) {
-    const now = Date.now();
-    const fallback = fallbackCommand(folderPath);
-    if (fallback) {
-      commands.push({
-        id: stableCommandId(folderPath, fallback.name, fallback.command),
-        ...fallback,
-        isFavorite: true,
-        createdAt: now,
-        updatedAt: now
-      });
-    }
-  }
-  if (exists("requirements.txt") || exists("pyproject.toml") || exists("Pipfile")) {
-    languages.push("Python");
-    tagsSet.add("Python");
-  }
-  if (exists("go.mod")) {
-    languages.push("Go");
-    tagsSet.add("Go");
-  }
-  if (exists("Cargo.toml")) {
-    languages.push("Rust");
-    tagsSet.add("Rust");
-  }
-  if (exists("pom.xml") || exists("build.gradle")) {
-    languages.push("Java");
-    tagsSet.add("Java");
-  }
-  return {
-    name: folderName,
-    tags: Array.from(tagsSet),
-    description,
-    commands,
+  return (c("requirements.txt") || c("pyproject.toml") || c("Pipfile")) && (o.push("Python"), n.add("Python")), c("go.mod") && (o.push("Go"), n.add("Go")), c("Cargo.toml") && (o.push("Rust"), n.add("Rust")), (c("pom.xml") || c("build.gradle")) && (o.push("Java"), n.add("Java")), {
+    name: t,
+    tags: Array.from(n),
+    description: a,
+    commands: i,
     details: {
-      languages,
-      frameworks,
-      packageManager,
-      hasGit,
-      hasDocker
+      languages: o,
+      frameworks: s,
+      packageManager: r,
+      hasGit: l,
+      hasDocker: u
     }
   };
 }
-const MAX_STRING = 4096;
-function requireString(value, field) {
-  if (typeof value !== "string") {
-    throw new Error(`${field} must be a string.`);
-  }
-  const trimmed = value.trim();
-  if (!trimmed) {
-    throw new Error(`${field} is required.`);
-  }
-  if (trimmed.length > MAX_STRING) {
-    throw new Error(`${field} is too long.`);
-  }
-  if (trimmed.includes("\0")) {
-    throw new Error(`${field} contains invalid characters.`);
-  }
-  return trimmed;
+const Gt = 4096;
+function C(e, t) {
+  if (typeof e != "string")
+    throw new Error(`${t} must be a string.`);
+  const n = e.trim();
+  if (!n)
+    throw new Error(`${t} is required.`);
+  if (n.length > Gt)
+    throw new Error(`${t} is too long.`);
+  if (n.includes("\0"))
+    throw new Error(`${t} contains invalid characters.`);
+  return n;
 }
-function requireId(value, field) {
-  const id = requireString(value, field);
-  if (!/^[A-Za-z0-9_-]{1,64}$/.test(id)) {
-    throw new Error(`${field} is not a valid identifier.`);
-  }
-  return id;
+function j(e, t) {
+  const n = C(e, t);
+  if (!/^[A-Za-z0-9_-]{1,64}$/.test(n))
+    throw new Error(`${t} is not a valid identifier.`);
+  return n;
 }
-function requireObject(value, field) {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) {
-    throw new Error(`${field} must be an object.`);
-  }
-  return value;
+function D(e, t) {
+  if (typeof e != "object" || e === null || Array.isArray(e))
+    throw new Error(`${t} must be an object.`);
+  return e;
 }
-function optionalBoolean(value, field) {
-  if (value === void 0 || value === null) return false;
-  if (typeof value !== "boolean") {
-    throw new Error(`${field} must be a boolean.`);
-  }
-  return value;
+function _(e, t) {
+  if (e == null) return !1;
+  if (typeof e != "boolean")
+    throw new Error(`${t} must be a boolean.`);
+  return e;
 }
-function handler(name, fn) {
-  return async (_event, ...args) => {
+function y(e, t) {
+  return async (n, ...o) => {
     try {
-      return await fn(...args);
-    } catch (e) {
-      const message = e instanceof Error ? e.message : String(e);
-      console.error(`IPC ${name} failed:`, message);
-      throw new Error(message);
+      return await t(...o);
+    } catch (s) {
+      const i = s instanceof Error ? s.message : String(s);
+      throw console.error(`IPC ${e} failed:`, i), new Error(i);
     }
   };
 }
-function withStatus(project) {
-  return { ...project, pathExists: Boolean(project.path) && fs.existsSync(project.path) };
+function N(e) {
+  return { ...e, pathExists: !!e.path && h.existsSync(e.path) };
 }
-function registerProjectIPC() {
-  ipcMain.handle(
+function zt() {
+  f.handle(
     "projects:getAll",
-    handler("projects:getAll", () => getProjects().map(withStatus))
-  );
-  ipcMain.handle(
+    y("projects:getAll", () => L().map(N))
+  ), f.handle(
     "projects:get",
-    handler("projects:get", (id) => {
-      const project = getProject(requireId(id, "Project id"));
-      return project ? withStatus(project) : void 0;
+    y("projects:get", (e) => {
+      const t = ue(j(e, "Project id"));
+      return t ? N(t) : void 0;
     })
-  );
-  ipcMain.handle(
+  ), f.handle(
     "projects:add",
-    handler("projects:add", (project) => {
-      const input = requireObject(project, "Project");
-      const name = requireString(input.name, "Project name");
-      const projectPath = requireString(input.path, "Project path");
-      if (!fs.existsSync(projectPath)) {
-        throw new Error(`The folder "${projectPath}" does not exist.`);
-      }
-      if (!fs.statSync(projectPath).isDirectory()) {
-        throw new Error(`"${projectPath}" is a file, not a folder.`);
-      }
-      return withStatus(
-        addProject({
-          ...input,
-          name,
-          path: projectPath,
-          tags: Array.isArray(input.tags) ? input.tags : [],
-          isFavorite: Boolean(input.isFavorite)
+    y("projects:add", (e) => {
+      const t = D(e, "Project"), n = C(t.name, "Project name"), o = C(t.path, "Project path");
+      if (!h.existsSync(o))
+        throw new Error(`The folder "${o}" does not exist.`);
+      if (!h.statSync(o).isDirectory())
+        throw new Error(`"${o}" is a file, not a folder.`);
+      return N(
+        Se({
+          ...t,
+          name: n,
+          path: o,
+          tags: Array.isArray(t.tags) ? t.tags : [],
+          isFavorite: !!t.isFavorite
         })
       );
     })
-  );
-  ipcMain.handle(
+  ), f.handle(
     "projects:update",
-    handler("projects:update", (id, updates) => {
-      const projectId = requireId(id, "Project id");
-      const patch = requireObject(updates, "Updates");
-      if (patch.path !== void 0) {
-        const nextPath = requireString(patch.path, "Project path");
-        if (!fs.existsSync(nextPath)) {
-          throw new Error(`The folder "${nextPath}" does not exist.`);
-        }
+    y("projects:update", (e, t) => {
+      const n = j(e, "Project id"), o = D(t, "Updates");
+      if (o.path !== void 0) {
+        const i = C(o.path, "Project path");
+        if (!h.existsSync(i))
+          throw new Error(`The folder "${i}" does not exist.`);
       }
-      if (patch.name !== void 0) {
-        requireString(patch.name, "Project name");
-      }
-      const updated = updateProject(projectId, patch);
-      if (!updated) throw new Error("Project not found.");
-      return withStatus(updated);
+      o.name !== void 0 && C(o.name, "Project name");
+      const s = V(n, o);
+      if (!s) throw new Error("Project not found.");
+      return N(s);
     })
-  );
-  ipcMain.handle(
+  ), f.handle(
     "projects:delete",
-    handler("projects:delete", (id) => deleteProject(requireId(id, "Project id")))
-  );
-  ipcMain.handle(
+    y("projects:delete", (e) => _t(j(e, "Project id")))
+  ), f.handle(
     "projects:detect",
-    handler(
+    y(
       "projects:detect",
-      (folderPath) => detectProjectMeta(requireString(folderPath, "Folder path"))
+      (e) => je(C(e, "Folder path"))
     )
-  );
-  ipcMain.handle(
+  ), f.handle(
     "projects:seedCommands",
-    handler("projects:seedCommands", (projectId, commands) => {
-      if (!Array.isArray(commands)) throw new Error("Commands must be an array.");
-      return withStatus(
-        seedProjectCommands(requireId(projectId, "Project id"), commands)
+    y("projects:seedCommands", (e, t) => {
+      if (!Array.isArray(t)) throw new Error("Commands must be an array.");
+      return N(
+        Ot(j(e, "Project id"), t)
       );
     })
-  );
-  ipcMain.handle(
+  ), f.handle(
     "projects:addCommand",
-    handler("projects:addCommand", (projectId, command) => {
-      const input = requireObject(command, "Command");
-      const { project, command: created } = addProjectCommand(
-        requireId(projectId, "Project id"),
-        input
+    y("projects:addCommand", (e, t) => {
+      const n = D(t, "Command"), { project: o, command: s } = Mt(
+        j(e, "Project id"),
+        n
       );
-      return { project: withStatus(project), command: created };
+      return { project: N(o), command: s };
     })
-  );
-  ipcMain.handle(
+  ), f.handle(
     "projects:updateCommand",
-    handler("projects:updateCommand", (projectId, commandId, updates) => {
-      const patch = requireObject(updates, "Updates");
-      const { project, command } = updateProjectCommand(
-        requireId(projectId, "Project id"),
-        requireId(commandId, "Command id"),
-        patch
+    y("projects:updateCommand", (e, t, n) => {
+      const o = D(n, "Updates"), { project: s, command: i } = Ft(
+        j(e, "Project id"),
+        j(t, "Command id"),
+        o
       );
-      return { project: withStatus(project), command };
+      return { project: N(s), command: i };
     })
-  );
-  ipcMain.handle(
+  ), f.handle(
     "projects:deleteCommand",
-    handler(
+    y(
       "projects:deleteCommand",
-      (projectId, commandId) => withStatus(
-        deleteProjectCommand(
-          requireId(projectId, "Project id"),
-          requireId(commandId, "Command id")
+      (e, t) => N(
+        Lt(
+          j(e, "Project id"),
+          j(t, "Command id")
         )
       )
     )
-  );
-  ipcMain.handle(
+  ), f.handle(
     "projects:runCommand",
-    handler("projects:runCommand", async (projectId, commandId, confirmed) => {
-      const { project } = await runProjectCommand(
-        requireId(projectId, "Project id"),
-        requireId(commandId, "Command id"),
-        optionalBoolean(confirmed, "Confirmation flag")
+    y("projects:runCommand", async (e, t, n) => {
+      const { project: o } = await Vt(
+        j(e, "Project id"),
+        j(t, "Command id"),
+        _(n, "Confirmation flag")
       );
-      return withStatus(project);
+      return N(o);
     })
-  );
-  ipcMain.handle(
+  ), f.handle(
     "projects:inspectCommand",
-    handler("projects:inspectCommand", (projectId, commandId) => {
-      const project = getProject(requireId(projectId, "Project id"));
-      if (!project) throw new Error("Project not found.");
-      const command = (project.commands ?? []).find(
-        (c) => c.id === requireId(commandId, "Command id")
+    y("projects:inspectCommand", (e, t) => {
+      const n = ue(j(e, "Project id"));
+      if (!n) throw new Error("Project not found.");
+      const o = (n.commands ?? []).find(
+        (s) => s.id === j(t, "Command id")
       );
-      if (!command) throw new Error("Command not found.");
-      return validateCommand(
+      if (!o) throw new Error("Command not found.");
+      return B(
         {
-          name: command.name,
-          command: command.command,
-          workingDirectory: command.workingDirectory
+          name: o.name,
+          command: o.command,
+          workingDirectory: o.workingDirectory
         },
-        project.path
+        n.path
       );
     })
-  );
-  ipcMain.handle(
+  ), f.handle(
     "projects:validateCommand",
-    handler("projects:validateCommand", (draft, projectPath) => {
-      const input = requireObject(draft, "Command");
-      return validateCommand(
+    y("projects:validateCommand", (e, t) => {
+      const n = D(e, "Command");
+      return B(
         {
-          name: typeof input.name === "string" ? input.name : "",
-          command: typeof input.command === "string" ? input.command : "",
-          workingDirectory: typeof input.workingDirectory === "string" ? input.workingDirectory : void 0
+          name: typeof n.name == "string" ? n.name : "",
+          command: typeof n.command == "string" ? n.command : "",
+          workingDirectory: typeof n.workingDirectory == "string" ? n.workingDirectory : void 0
         },
-        typeof projectPath === "string" ? projectPath : void 0
+        typeof t == "string" ? t : void 0
       );
     })
-  );
-  ipcMain.handle(
+  ), f.handle(
     "projects:launch",
-    handler("projects:launch", async (id, action, newWindow) => {
-      const { project } = await launchProject(
-        requireId(id, "Project id"),
-        requireString(action, "Action"),
-        optionalBoolean(newWindow, "New window flag")
+    y("projects:launch", async (e, t, n) => {
+      const { project: o } = await Ut(
+        j(e, "Project id"),
+        C(t, "Action"),
+        _(n, "New window flag")
       );
-      return withStatus(project);
+      return N(o);
     })
   );
 }
-function readGroups() {
-  const data = readData("groups");
-  if (data.length === 0) {
-    const defaultGroups = [
+function K() {
+  const e = ve("groups");
+  if (e.length === 0) {
+    const t = [
       { id: "group_freelance", name: "Freelance", sortOrder: 1, createdAt: Date.now(), updatedAt: Date.now() },
       { id: "group_personal", name: "Personal", sortOrder: 2, createdAt: Date.now(), updatedAt: Date.now() },
       { id: "group_experiments", name: "Experiments", sortOrder: 3, createdAt: Date.now(), updatedAt: Date.now() },
       { id: "group_learning", name: "Learning", sortOrder: 4, createdAt: Date.now(), updatedAt: Date.now() }
     ];
-    writeData("groups", defaultGroups);
-    return defaultGroups;
+    return Q("groups", t), t;
   }
-  return data;
+  return e;
 }
-function writeGroups(groups) {
-  writeData("groups", groups);
+function Ee(e) {
+  Q("groups", e);
 }
-function getGroups() {
-  return readGroups();
+function Ht() {
+  return K();
 }
-function getGroup(id) {
-  const groups = readGroups();
-  return groups.find((group) => group.id === id);
+function Jt(e) {
+  return K().find((n) => n.id === e);
 }
-function addGroup(groupData) {
-  const groups = readGroups();
-  const newGroup = {
-    id: groupData.id || generateId("group"),
-    name: groupData.name,
-    icon: groupData.icon,
-    color: groupData.color,
-    sortOrder: groupData.sortOrder ?? groups.length + 1,
-    createdAt: groupData.createdAt || Date.now(),
-    updatedAt: groupData.updatedAt || Date.now()
+function qt(e) {
+  const t = K(), n = {
+    id: e.id || T("group"),
+    name: e.name,
+    icon: e.icon,
+    color: e.color,
+    sortOrder: e.sortOrder ?? t.length + 1,
+    createdAt: e.createdAt || Date.now(),
+    updatedAt: e.updatedAt || Date.now()
   };
-  groups.push(newGroup);
-  writeGroups(groups);
-  return newGroup;
+  return t.push(n), Ee(t), n;
 }
-function updateGroup(id, updates) {
-  const groups = readGroups();
-  const index = groups.findIndex((g) => g.id === id);
-  if (index === -1) {
-    return void 0;
-  }
-  const updatedGroup = {
-    ...groups[index],
-    ...updates,
+function Zt(e, t) {
+  const n = K(), o = n.findIndex((i) => i.id === e);
+  if (o === -1)
+    return;
+  const s = {
+    ...n[o],
+    ...t,
     updatedAt: Date.now()
   };
-  groups[index] = updatedGroup;
-  writeGroups(groups);
-  return updatedGroup;
+  return n[o] = s, Ee(n), s;
 }
-function deleteGroup(id) {
-  const groups = readGroups();
-  const filtered = groups.filter((g) => g.id !== id);
-  if (filtered.length === groups.length) {
-    return false;
-  }
-  writeGroups(filtered);
-  return true;
+function Kt(e) {
+  const t = K(), n = t.filter((o) => o.id !== e);
+  return n.length === t.length ? !1 : (Ee(n), !0);
 }
-function registerGroupIPC() {
-  ipcMain.handle("groups:getAll", () => {
-    return getGroups();
-  });
-  ipcMain.handle("groups:get", (_, id) => {
-    return getGroup(id);
-  });
-  ipcMain.handle("groups:add", (_, groupData) => {
-    return addGroup(groupData);
-  });
-  ipcMain.handle("groups:update", (_, id, updates) => {
-    return updateGroup(id, updates);
-  });
-  ipcMain.handle("groups:delete", (_, id) => {
-    return deleteGroup(id);
-  });
+function Yt() {
+  f.handle("groups:getAll", () => Ht()), f.handle("groups:get", (e, t) => Jt(t)), f.handle("groups:add", (e, t) => qt(t)), f.handle("groups:update", (e, t, n) => Zt(t, n)), f.handle("groups:delete", (e, t) => Kt(t));
 }
-function registerDialogIPC() {
-  ipcMain.handle(
+function Xt() {
+  f.handle(
     "dialog:selectFolder",
-    handler("dialog:selectFolder", async (defaultPath) => {
-      const parent = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0];
-      const options = {
+    y("dialog:selectFolder", async (e) => {
+      const t = R.getFocusedWindow() ?? R.getAllWindows()[0], n = {
         title: "Select project folder",
         properties: ["openDirectory", "createDirectory"]
       };
-      if (typeof defaultPath === "string" && defaultPath && fs.existsSync(defaultPath)) {
-        options.defaultPath = defaultPath;
-      }
-      const result = parent ? await dialog.showOpenDialog(parent, options) : await dialog.showOpenDialog(options);
-      if (result.canceled || result.filePaths.length === 0) return null;
-      const selected = result.filePaths[0];
-      return { path: selected, name: path.basename(selected) };
+      typeof e == "string" && e && h.existsSync(e) && (n.defaultPath = e);
+      const o = t ? await $e.showOpenDialog(t, n) : await $e.showOpenDialog(n);
+      if (o.canceled || o.filePaths.length === 0) return null;
+      const s = o.filePaths[0];
+      return { path: s, name: d.basename(s) };
     })
-  );
-  ipcMain.handle(
+  ), f.handle(
     "dialog:pathExists",
-    handler("dialog:pathExists", (target) => {
-      const candidate = requireString(target, "Path");
-      return fs.existsSync(candidate) && fs.statSync(candidate).isDirectory();
+    y("dialog:pathExists", (e) => {
+      const t = C(e, "Path");
+      return h.existsSync(t) && h.statSync(t).isDirectory();
     })
-  );
-  ipcMain.handle(
+  ), f.handle(
     "shell:openExternal",
-    handler("shell:openExternal", async (url) => {
-      const target = requireString(url, "URL");
-      let parsed;
+    y("shell:openExternal", async (e) => {
+      const t = C(e, "URL");
+      let n;
       try {
-        parsed = new URL(target);
+        n = new URL(t);
       } catch {
         throw new Error("That is not a valid URL.");
       }
-      if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      if (n.protocol !== "http:" && n.protocol !== "https:")
         throw new Error("Only http and https links can be opened.");
-      }
-      await shell.openExternal(parsed.toString());
-      return true;
+      return await de.openExternal(n.toString()), !0;
     })
   );
 }
-async function measureDirectory(target) {
-  const stats = { sizeBytes: 0, fileCount: 0, lastModified: 0 };
-  const stack = [target];
-  while (stack.length > 0) {
-    const current = stack.pop();
-    let entries;
+async function et(e) {
+  const t = { sizeBytes: 0, fileCount: 0, lastModified: 0 }, n = [e];
+  for (; n.length > 0; ) {
+    const o = n.pop();
+    let s;
     try {
-      entries = await promises.readdir(current, { withFileTypes: true });
+      s = await S.readdir(o, { withFileTypes: !0 });
     } catch {
       continue;
     }
-    for (const entry of entries) {
-      const full = path.join(current, entry.name);
-      if (entry.isSymbolicLink()) {
-        stats.fileCount += 1;
+    for (const i of s) {
+      const r = d.join(o, i.name);
+      if (i.isSymbolicLink()) {
+        t.fileCount += 1;
         continue;
       }
-      if (entry.isDirectory()) {
-        stack.push(full);
+      if (i.isDirectory()) {
+        n.push(r);
         continue;
       }
       try {
-        const info = await promises.stat(full);
-        stats.sizeBytes += info.size;
-        stats.fileCount += 1;
-        if (info.mtimeMs > stats.lastModified) stats.lastModified = info.mtimeMs;
+        const a = await S.stat(r);
+        t.sizeBytes += a.size, t.fileCount += 1, a.mtimeMs > t.lastModified && (t.lastModified = a.mtimeMs);
       } catch {
       }
     }
   }
-  return stats;
+  return t;
 }
-async function findNodeModules(root, maxDepth = 3) {
-  const found = [];
-  const queue = [{ dir: root, depth: 0 }];
-  const IGNORED = /* @__PURE__ */ new Set([".git", ".next", "dist", "build", "out", ".cache", ".turbo"]);
-  while (queue.length > 0) {
-    const { dir, depth } = queue.shift();
-    let entries;
+async function Qt(e, t = 3) {
+  const n = [], o = [{ dir: e, depth: 0 }], s = /* @__PURE__ */ new Set([".git", ".next", "dist", "build", "out", ".cache", ".turbo"]);
+  for (; o.length > 0; ) {
+    const { dir: i, depth: r } = o.shift();
+    let a;
     try {
-      entries = await promises.readdir(dir, { withFileTypes: true });
+      a = await S.readdir(i, { withFileTypes: !0 });
     } catch {
       continue;
     }
-    for (const entry of entries) {
-      if (!entry.isDirectory() || entry.isSymbolicLink()) continue;
-      if (entry.name === "node_modules") {
-        found.push(path.join(dir, entry.name));
-        continue;
+    for (const c of a)
+      if (!(!c.isDirectory() || c.isSymbolicLink())) {
+        if (c.name === "node_modules") {
+          n.push(d.join(i, c.name));
+          continue;
+        }
+        r < t && !s.has(c.name) && !c.name.startsWith(".") && o.push({ dir: d.join(i, c.name), depth: r + 1 });
       }
-      if (depth < maxDepth && !IGNORED.has(entry.name) && !entry.name.startsWith(".")) {
-        queue.push({ dir: path.join(dir, entry.name), depth: depth + 1 });
-      }
-    }
   }
-  return found;
+  return n;
 }
-const STALE_AFTER_DAYS = 30;
-const DAY_MS$1 = 24 * 60 * 60 * 1e3;
-async function scanNodeModules(onProgress) {
-  const projects = getProjects();
-  const entries = [];
-  const warnings = [];
-  let scannedProjects = 0;
-  let skippedProjects = 0;
-  for (let i = 0; i < projects.length; i += 1) {
-    const project = projects[i];
-    onProgress == null ? void 0 : onProgress({
-      current: i + 1,
-      total: projects.length,
-      projectName: project.name,
-      done: false
-    });
-    if (!project.path || !fs.existsSync(project.path)) {
-      skippedProjects += 1;
+const Re = 30, Ie = 24 * 60 * 60 * 1e3;
+async function en(e) {
+  const t = L(), n = [], o = [];
+  let s = 0, i = 0;
+  for (let r = 0; r < t.length; r += 1) {
+    const a = t[r];
+    if (e == null || e({
+      current: r + 1,
+      total: t.length,
+      projectName: a.name,
+      done: !1
+    }), !a.path || !h.existsSync(a.path)) {
+      i += 1;
       continue;
     }
-    let modulePaths;
+    let c;
     try {
-      modulePaths = await findNodeModules(project.path);
-    } catch (e) {
-      warnings.push(`Could not scan ${project.name}: ${e.message}`);
-      skippedProjects += 1;
+      c = await Qt(a.path);
+    } catch (l) {
+      o.push(`Could not scan ${a.name}: ${l.message}`), i += 1;
       continue;
     }
-    scannedProjects += 1;
-    for (const modulesPath of modulePaths) {
-      const stats = await measureDirectory(modulesPath);
-      const daysSinceOpened = project.lastOpenedAt ? Math.floor((Date.now() - project.lastOpenedAt) / DAY_MS$1) : null;
-      const daysSinceModified = stats.lastModified ? Math.floor((Date.now() - stats.lastModified) / DAY_MS$1) : null;
-      const isStale = daysSinceOpened === null ? (daysSinceModified ?? 0) >= STALE_AFTER_DAYS : daysSinceOpened >= STALE_AFTER_DAYS;
-      const relative = path.relative(project.path, modulesPath);
-      entries.push({
-        projectId: project.id,
-        projectName: project.name,
-        projectPath: project.path,
-        modulesPath,
-        relativeLabel: relative || "node_modules",
-        sizeBytes: stats.sizeBytes,
-        fileCount: stats.fileCount,
-        lastModified: stats.lastModified,
-        lastOpenedAt: project.lastOpenedAt,
-        daysSinceOpened,
-        isStale
+    s += 1;
+    for (const l of c) {
+      const u = await et(l), p = a.lastOpenedAt ? Math.floor((Date.now() - a.lastOpenedAt) / Ie) : null, w = u.lastModified ? Math.floor((Date.now() - u.lastModified) / Ie) : null, g = p === null ? (w ?? 0) >= Re : p >= Re, m = d.relative(a.path, l);
+      n.push({
+        projectId: a.id,
+        projectName: a.name,
+        projectPath: a.path,
+        modulesPath: l,
+        relativeLabel: m || "node_modules",
+        sizeBytes: u.sizeBytes,
+        fileCount: u.fileCount,
+        lastModified: u.lastModified,
+        lastOpenedAt: a.lastOpenedAt,
+        daysSinceOpened: p,
+        isStale: g
       });
     }
   }
-  onProgress == null ? void 0 : onProgress({
-    current: projects.length,
-    total: projects.length,
+  return e == null || e({
+    current: t.length,
+    total: t.length,
     projectName: "",
-    done: true
-  });
-  entries.sort((a, b) => b.sizeBytes - a.sizeBytes);
-  return {
-    entries,
-    totalBytes: entries.reduce((sum, e) => sum + e.sizeBytes, 0),
-    staleBytes: entries.filter((e) => e.isStale).reduce((sum, e) => sum + e.sizeBytes, 0),
-    scannedProjects,
-    skippedProjects,
-    warnings
+    done: !0
+  }), n.sort((r, a) => a.sizeBytes - r.sizeBytes), {
+    entries: n,
+    totalBytes: n.reduce((r, a) => r + a.sizeBytes, 0),
+    staleBytes: n.filter((r) => r.isStale).reduce((r, a) => r + a.sizeBytes, 0),
+    scannedProjects: s,
+    skippedProjects: i,
+    warnings: o
   };
 }
-async function deleteNodeModules(targets) {
-  const projects = getProjects();
-  const projectRoots = projects.filter((p) => p.path).map((p) => path.resolve(p.path));
-  const result = { deleted: [], failed: [], reclaimedBytes: 0 };
-  for (const rawTarget of targets) {
-    const target = path.resolve(rawTarget);
-    const reject = (reason) => result.failed.push({ path: rawTarget, reason });
-    if (path.basename(target) !== "node_modules") {
-      reject("Not a node_modules directory.");
+async function tn(e) {
+  const n = L().filter((s) => s.path).map((s) => d.resolve(s.path)), o = { deleted: [], failed: [], reclaimedBytes: 0 };
+  for (const s of e) {
+    const i = d.resolve(s), r = (u) => o.failed.push({ path: s, reason: u });
+    if (d.basename(i) !== "node_modules") {
+      r("Not a node_modules directory.");
       continue;
     }
-    const owningRoot = projectRoots.find(
-      (root) => target.startsWith(root + path.sep) && target !== root
-    );
-    if (!owningRoot) {
-      reject("Not inside a registered project folder.");
+    if (!n.find(
+      (u) => i.startsWith(u + d.sep) && i !== u
+    )) {
+      r("Not inside a registered project folder.");
       continue;
     }
-    let stat;
+    let c;
     try {
-      stat = await promises.lstat(target);
+      c = await S.lstat(i);
     } catch {
-      reject("Folder no longer exists.");
+      r("Folder no longer exists.");
       continue;
     }
-    if (stat.isSymbolicLink()) {
-      reject("Refusing to follow a symlink.");
+    if (c.isSymbolicLink()) {
+      r("Refusing to follow a symlink.");
       continue;
     }
-    if (!stat.isDirectory()) {
-      reject("Not a directory.");
+    if (!c.isDirectory()) {
+      r("Not a directory.");
       continue;
     }
-    const { sizeBytes } = await measureDirectory(target);
+    const { sizeBytes: l } = await et(i);
     try {
-      await promises.rm(target, { recursive: true, force: true, maxRetries: 3, retryDelay: 200 });
-      result.deleted.push(target);
-      result.reclaimedBytes += sizeBytes;
-    } catch (e) {
-      const message = e.code === "EBUSY" ? "Files are in use. Close your editor or dev server and try again." : e.message;
-      reject(message);
+      await S.rm(i, { recursive: !0, force: !0, maxRetries: 3, retryDelay: 200 }), o.deleted.push(i), o.reclaimedBytes += l;
+    } catch (u) {
+      const p = u.code === "EBUSY" ? "Files are in use. Close your editor or dev server and try again." : u.message;
+      r(p);
     }
   }
-  return result;
+  return o;
 }
-function capture(command, args, timeoutMs = 1e4) {
-  return new Promise((resolve, reject) => {
-    execFile(
-      command,
-      args,
-      { timeout: timeoutMs, windowsHide: true, maxBuffer: 8 * 1024 * 1024 },
-      (error, stdout, stderr) => {
-        if (error) {
-          const err = error;
-          if (err.code === "ENOENT") {
-            reject(new Error(`"${command}" is not available on this system.`));
+function M(e, t, n = 1e4) {
+  return new Promise((o, s) => {
+    wt(
+      e,
+      t,
+      { timeout: n, windowsHide: !0, maxBuffer: 8 * 1024 * 1024 },
+      (i, r, a) => {
+        if (i) {
+          const c = i;
+          if (c.code === "ENOENT") {
+            s(new Error(`"${e}" is not available on this system.`));
             return;
           }
-          resolve({
-            stdout: stdout ?? "",
-            stderr: stderr ?? "",
-            code: typeof err.code === "number" ? err.code : 1
+          o({
+            stdout: r ?? "",
+            stderr: a ?? "",
+            code: typeof c.code == "number" ? c.code : 1
           });
           return;
         }
-        resolve({ stdout, stderr, code: 0 });
+        o({ stdout: r, stderr: a, code: 0 });
       }
     );
   });
 }
-const KNOWN_SERVICES = {
+const nn = {
   80: "HTTP",
   443: "HTTPS",
   3e3: "Node / Next.js",
@@ -1473,138 +1103,115 @@ const KNOWN_SERVICES = {
   5672: "RabbitMQ",
   9200: "Elasticsearch",
   11434: "Ollama"
-};
-const PROTECTED_PIDS = /* @__PURE__ */ new Set([0, 4]);
-function classifyPort(port) {
-  const knownService = KNOWN_SERVICES[port];
-  const isDevPort = Boolean(knownService) || port >= 3e3 && port <= 9999 || port >= 4e3 && port <= 5999;
-  return { isDevPort, knownService };
+}, xe = /* @__PURE__ */ new Set([0, 4]);
+function tt(e) {
+  const t = nn[e];
+  return { isDevPort: !!t || e >= 3e3 && e <= 9999 || e >= 4e3 && e <= 5999, knownService: t };
 }
-async function listPorts() {
-  const warnings = [];
-  const entries = isWindows ? await listPortsWindows(warnings) : await listPortsUnix(warnings);
-  const byPort = /* @__PURE__ */ new Map();
-  for (const entry of entries) {
-    const key = `${entry.port}:${entry.pid}`;
-    if (!byPort.has(key)) byPort.set(key, entry);
+async function nt() {
+  const e = [], t = q ? await on(e) : await rn(e), n = /* @__PURE__ */ new Map();
+  for (const s of t) {
+    const i = `${s.port}:${s.pid}`;
+    n.has(i) || n.set(i, s);
   }
-  const deduped = [...byPort.values()].sort((a, b) => a.port - b.port);
-  return { entries: deduped, scannedAt: Date.now(), warnings };
+  return { entries: [...n.values()].sort((s, i) => s.port - i.port), scannedAt: Date.now(), warnings: e };
 }
-async function listPortsWindows(warnings) {
-  const { stdout } = await capture("netstat", ["-ano", "-p", "TCP"]);
-  const entries = [];
-  for (const line of stdout.split(/\r?\n/)) {
-    const parts = line.trim().split(/\s+/);
-    if (parts.length < 5 || parts[0].toUpperCase() !== "TCP") continue;
-    if (parts[3].toUpperCase() !== "LISTENING") continue;
-    const local = parts[1];
-    const pid = Number(parts[4]);
-    if (!Number.isFinite(pid)) continue;
-    const separator = local.lastIndexOf(":");
-    if (separator === -1) continue;
-    const port = Number(local.slice(separator + 1));
-    if (!Number.isFinite(port) || port === 0) continue;
-    const { isDevPort, knownService } = classifyPort(port);
-    entries.push({
-      port,
-      pid,
+async function on(e) {
+  const { stdout: t } = await M("netstat", ["-ano", "-p", "TCP"]), n = [];
+  for (const o of t.split(/\r?\n/)) {
+    const s = o.trim().split(/\s+/);
+    if (s.length < 5 || s[0].toUpperCase() !== "TCP" || s[3].toUpperCase() !== "LISTENING") continue;
+    const i = s[1], r = Number(s[4]);
+    if (!Number.isFinite(r)) continue;
+    const a = i.lastIndexOf(":");
+    if (a === -1) continue;
+    const c = Number(i.slice(a + 1));
+    if (!Number.isFinite(c) || c === 0) continue;
+    const { isDevPort: l, knownService: u } = tt(c);
+    n.push({
+      port: c,
+      pid: r,
       protocol: "TCP",
-      address: local.slice(0, separator) || "0.0.0.0",
+      address: i.slice(0, a) || "0.0.0.0",
       state: "LISTENING",
-      isDevPort,
-      knownService,
-      isProtected: PROTECTED_PIDS.has(pid)
+      isDevPort: l,
+      knownService: u,
+      isProtected: xe.has(r)
     });
   }
-  await attachWindowsProcessNames(entries, warnings);
-  return entries;
+  return await sn(n, e), n;
 }
-async function attachWindowsProcessNames(entries, warnings) {
-  if (entries.length === 0) return;
-  try {
-    const { stdout } = await capture("tasklist", ["/FO", "CSV", "/NH"]);
-    const names = /* @__PURE__ */ new Map();
-    for (const line of stdout.split(/\r?\n/)) {
-      const fields = line.match(/"([^"]*)"/g);
-      if (!fields || fields.length < 2) continue;
-      const name = fields[0].replace(/"/g, "");
-      const pid = Number(fields[1].replace(/"/g, ""));
-      if (Number.isFinite(pid)) names.set(pid, name);
+async function sn(e, t) {
+  if (e.length !== 0)
+    try {
+      const { stdout: n } = await M("tasklist", ["/FO", "CSV", "/NH"]), o = /* @__PURE__ */ new Map();
+      for (const s of n.split(/\r?\n/)) {
+        const i = s.match(/"([^"]*)"/g);
+        if (!i || i.length < 2) continue;
+        const r = i[0].replace(/"/g, ""), a = Number(i[1].replace(/"/g, ""));
+        Number.isFinite(a) && o.set(a, r);
+      }
+      for (const s of e)
+        s.processName = o.get(s.pid);
+    } catch (n) {
+      t.push(`Could not resolve process names: ${n.message}`);
     }
-    for (const entry of entries) {
-      entry.processName = names.get(entry.pid);
-    }
-  } catch (e) {
-    warnings.push(`Could not resolve process names: ${e.message}`);
-  }
 }
-async function listPortsUnix(warnings) {
+async function rn(e) {
   try {
-    const { stdout } = await capture("lsof", ["-nP", "-iTCP", "-sTCP:LISTEN"]);
-    const entries = [];
-    for (const line of stdout.split("\n").slice(1)) {
-      const parts = line.trim().split(/\s+/);
-      if (parts.length < 9) continue;
-      const processName = parts[0];
-      const pid = Number(parts[1]);
-      const name = parts[8];
-      if (!Number.isFinite(pid)) continue;
-      const separator = name.lastIndexOf(":");
-      if (separator === -1) continue;
-      const port = Number(name.slice(separator + 1));
-      if (!Number.isFinite(port) || port === 0) continue;
-      const { isDevPort, knownService } = classifyPort(port);
-      entries.push({
-        port,
-        pid,
+    const { stdout: t } = await M("lsof", ["-nP", "-iTCP", "-sTCP:LISTEN"]), n = [];
+    for (const o of t.split(`
+`).slice(1)) {
+      const s = o.trim().split(/\s+/);
+      if (s.length < 9) continue;
+      const i = s[0], r = Number(s[1]), a = s[8];
+      if (!Number.isFinite(r)) continue;
+      const c = a.lastIndexOf(":");
+      if (c === -1) continue;
+      const l = Number(a.slice(c + 1));
+      if (!Number.isFinite(l) || l === 0) continue;
+      const { isDevPort: u, knownService: p } = tt(l);
+      n.push({
+        port: l,
+        pid: r,
         protocol: "TCP",
-        address: name.slice(0, separator) || "*",
+        address: a.slice(0, c) || "*",
         state: "LISTEN",
-        processName,
-        isDevPort,
-        knownService,
-        isProtected: PROTECTED_PIDS.has(pid)
+        processName: i,
+        isDevPort: u,
+        knownService: p,
+        isProtected: xe.has(r)
       });
     }
-    return entries;
-  } catch (e) {
-    warnings.push(e.message);
-    return [];
+    return n;
+  } catch (t) {
+    return e.push(t.message), [];
   }
 }
-async function killByPid(pid, expectedPort) {
-  if (!Number.isInteger(pid) || pid <= 0) {
+async function an(e, t) {
+  if (!Number.isInteger(e) || e <= 0)
     throw new Error("Invalid process id.");
-  }
-  if (PROTECTED_PIDS.has(pid)) {
+  if (xe.has(e))
     throw new Error("That is a protected system process and cannot be stopped.");
-  }
-  const { entries } = await listPorts();
-  const match = entries.find((e) => e.pid === pid && e.port === expectedPort);
-  if (!match) {
+  const { entries: n } = await nt(), o = n.find((i) => i.pid === e && i.port === t);
+  if (!o)
     throw new Error(
-      `Nothing is listening on port ${expectedPort} with PID ${pid} any more. Refresh the list.`
+      `Nothing is listening on port ${t} with PID ${e} any more. Refresh the list.`
     );
-  }
-  const result = isWindows ? await capture("taskkill", ["/PID", String(pid), "/F", "/T"]) : await capture("kill", ["-9", String(pid)]);
-  if (result.code !== 0) {
-    const detail = (result.stderr || result.stdout).trim();
+  const s = q ? await M("taskkill", ["/PID", String(e), "/F", "/T"]) : await M("kill", ["-9", String(e)]);
+  if (s.code !== 0) {
+    const i = (s.stderr || s.stdout).trim();
     throw new Error(
-      detail.toLowerCase().includes("access is denied") || detail.toLowerCase().includes("not permitted") ? `Access denied stopping PID ${pid}. It may need administrator rights.` : detail || `Could not stop PID ${pid}.`
+      i.toLowerCase().includes("access is denied") || i.toLowerCase().includes("not permitted") ? `Access denied stopping PID ${e}. It may need administrator rights.` : i || `Could not stop PID ${e}.`
     );
   }
   return {
-    pid,
-    killed: true,
-    message: `Stopped ${match.processName ?? `PID ${pid}`} on port ${expectedPort}.`
+    pid: e,
+    killed: !0,
+    message: `Stopped ${o.processName ?? `PID ${e}`} on port ${t}.`
   };
 }
-const EXAMPLE_NAMES = [".env.example", ".env.sample", ".env.template", ".env.dist"];
-const ACTIVE_NAMES = [".env", ".env.local", ".env.development", ".env.development.local"];
-const ENV_FILE_PATTERN = /^\.env(\..+)?$/;
-const MAX_ENV_DEPTH = 3;
-const SKIP_DIRS = /* @__PURE__ */ new Set([
+const cn = [".env.example", ".env.sample", ".env.template", ".env.dist"], _e = [".env", ".env.local", ".env.development", ".env.development.local"], dn = /^\.env(\..+)?$/, ln = 3, un = /* @__PURE__ */ new Set([
   "node_modules",
   ".git",
   "dist",
@@ -1625,475 +1232,376 @@ const SKIP_DIRS = /* @__PURE__ */ new Set([
   ".idea",
   ".vscode"
 ]);
-function parseEnvKeys(contents) {
-  const keys = [];
-  const emptyKeys = /* @__PURE__ */ new Set();
-  const seen = /* @__PURE__ */ new Set();
-  for (const rawLine of contents.split(/\r?\n/)) {
-    const line = rawLine.trim();
-    if (!line || line.startsWith("#")) continue;
-    const withoutExport = line.startsWith("export ") ? line.slice(7).trim() : line;
-    const separator = withoutExport.indexOf("=");
-    if (separator <= 0) continue;
-    const key = withoutExport.slice(0, separator).trim();
-    if (!key || !/^[A-Za-z_][A-Za-z0-9_.]*$/.test(key)) continue;
-    const rawValue = withoutExport.slice(separator + 1).trim();
-    const unquoted = rawValue.replace(/^(['"])(.*)\1$/s, "$2").trim();
-    const isEmpty = unquoted.length === 0;
-    if (!seen.has(key)) {
-      seen.add(key);
-      keys.push(key);
-    }
-    if (isEmpty) emptyKeys.add(key);
-    else emptyKeys.delete(key);
+function pn(e) {
+  const t = [], n = /* @__PURE__ */ new Set(), o = /* @__PURE__ */ new Set();
+  for (const s of e.split(/\r?\n/)) {
+    const i = s.trim();
+    if (!i || i.startsWith("#")) continue;
+    const r = i.startsWith("export ") ? i.slice(7).trim() : i, a = r.indexOf("=");
+    if (a <= 0) continue;
+    const c = r.slice(0, a).trim();
+    if (!c || !/^[A-Za-z_][A-Za-z0-9_.]*$/.test(c)) continue;
+    const p = r.slice(a + 1).trim().replace(/^(['"])(.*)\1$/s, "$2").trim().length === 0;
+    o.has(c) || (o.add(c), t.push(c)), p ? n.add(c) : n.delete(c);
   }
-  return { keys, emptyKeys };
+  return { keys: t, emptyKeys: n };
 }
-async function readEnvFile(filePath) {
+async function mn(e) {
   try {
-    const contents = await promises.readFile(filePath, "utf8");
-    return parseEnvKeys(contents);
+    const t = await S.readFile(e, "utf8");
+    return pn(t);
   } catch {
     return null;
   }
 }
-async function findEnvDirectories(root) {
-  const found = /* @__PURE__ */ new Map();
-  const queue = [{ dir: root, depth: 0 }];
-  while (queue.length > 0) {
-    const { dir, depth } = queue.shift();
-    let entries;
+async function fn(e) {
+  const t = /* @__PURE__ */ new Map(), n = [{ dir: e, depth: 0 }];
+  for (; n.length > 0; ) {
+    const { dir: o, depth: s } = n.shift();
+    let i;
     try {
-      entries = await promises.readdir(dir, { withFileTypes: true });
+      i = await S.readdir(o, { withFileTypes: !0 });
     } catch {
       continue;
     }
-    const envFiles = [];
-    for (const entry of entries) {
-      if (entry.isFile() && ENV_FILE_PATTERN.test(entry.name)) {
-        envFiles.push(entry.name);
+    const r = [];
+    for (const a of i) {
+      if (a.isFile() && dn.test(a.name)) {
+        r.push(a.name);
         continue;
       }
-      if (entry.isDirectory() && !entry.isSymbolicLink() && depth < MAX_ENV_DEPTH && !SKIP_DIRS.has(entry.name)) {
-        queue.push({ dir: path.join(dir, entry.name), depth: depth + 1 });
-      }
+      a.isDirectory() && !a.isSymbolicLink() && s < ln && !un.has(a.name) && n.push({ dir: d.join(o, a.name), depth: s + 1 });
     }
-    if (envFiles.length > 0) {
-      found.set(path.relative(root, dir), envFiles.sort());
-    }
+    r.length > 0 && t.set(d.relative(e, o), r.sort());
   }
-  return found;
+  return t;
 }
-async function isEnvGitIgnored(projectRoot, relativeDir) {
-  const candidates = [path.join(projectRoot, ".gitignore")];
-  if (relativeDir) {
-    candidates.push(path.join(projectRoot, relativeDir, ".gitignore"));
-  }
-  for (const gitignorePath of candidates) {
+async function hn(e, t) {
+  const n = [d.join(e, ".gitignore")];
+  t && n.push(d.join(e, t, ".gitignore"));
+  for (const o of n)
     try {
-      const contents = await promises.readFile(gitignorePath, "utf8");
-      const covered = contents.split(/\r?\n/).map((l) => l.trim()).some(
-        (l) => l === ".env" || l === ".env*" || l === "*.env" || l === ".env.*" || l === "**/.env" || l.endsWith("/.env")
-      );
-      if (covered) return true;
+      if ((await S.readFile(o, "utf8")).split(/\r?\n/).map((r) => r.trim()).some(
+        (r) => r === ".env" || r === ".env*" || r === "*.env" || r === ".env.*" || r === "**/.env" || r.endsWith("/.env")
+      )) return !0;
     } catch {
     }
-  }
-  return false;
+  return !1;
 }
-async function auditLocation(projectRoot, relativeDir, envFiles) {
-  const warnings = [];
-  const absoluteDir = path.join(projectRoot, relativeDir);
-  const parsedByName = /* @__PURE__ */ new Map();
-  const files = [];
-  for (const fileName of envFiles) {
-    const parsed = await readEnvFile(path.join(absoluteDir, fileName));
-    if (!parsed) {
-      warnings.push(`Could not read ${fileName}.`);
+async function gn(e, t, n) {
+  const o = [], s = d.join(e, t), i = /* @__PURE__ */ new Map(), r = [];
+  for (const b of n) {
+    const $ = await mn(d.join(s, b));
+    if (!$) {
+      o.push(`Could not read ${b}.`);
       continue;
     }
-    parsedByName.set(fileName, parsed);
-    files.push({
-      fileName,
-      keyCount: parsed.keys.length,
-      emptyKeys: parsed.emptyKeys.size
+    i.set(b, $), r.push({
+      fileName: b,
+      keyCount: $.keys.length,
+      emptyKeys: $.emptyKeys.size
     });
   }
-  const exampleFile = EXAMPLE_NAMES.find((name) => parsedByName.has(name));
-  const activeFile = ACTIVE_NAMES.find((name) => parsedByName.has(name));
-  const example = exampleFile ? parsedByName.get(exampleFile) : void 0;
-  const active = activeFile ? parsedByName.get(activeFile) : void 0;
-  const keys = [];
-  let missingCount = 0;
-  let emptyCount = 0;
-  let extraCount = 0;
-  if (example && active) {
-    const activeKeys = new Set(active.keys);
-    for (const key of example.keys) {
-      if (!activeKeys.has(key)) {
-        keys.push({ key, status: "missing" });
-        missingCount += 1;
-      } else if (active.emptyKeys.has(key)) {
-        keys.push({ key, status: "empty" });
-        emptyCount += 1;
-      } else {
-        keys.push({ key, status: "ok" });
-      }
+  const a = cn.find((b) => i.has(b)), c = _e.find((b) => i.has(b)), l = a ? i.get(a) : void 0, u = c ? i.get(c) : void 0, p = [];
+  let w = 0, g = 0, m = 0;
+  if (l && u) {
+    const b = new Set(u.keys);
+    for (const P of l.keys)
+      b.has(P) ? u.emptyKeys.has(P) ? (p.push({ key: P, status: "empty" }), g += 1) : p.push({ key: P, status: "ok" }) : (p.push({ key: P, status: "missing" }), w += 1);
+    const $ = new Set(l.keys);
+    for (const P of u.keys)
+      $.has(P) || (p.push({ key: P, status: "extra" }), m += 1);
+  } else if (u) {
+    for (const b of u.keys) {
+      const $ = u.emptyKeys.has(b);
+      p.push({ key: b, status: $ ? "empty" : "ok" }), $ && (g += 1);
     }
-    const exampleKeys = new Set(example.keys);
-    for (const key of active.keys) {
-      if (!exampleKeys.has(key)) {
-        keys.push({ key, status: "extra" });
-        extraCount += 1;
-      }
-    }
-  } else if (active) {
-    for (const key of active.keys) {
-      const isEmpty = active.emptyKeys.has(key);
-      keys.push({ key, status: isEmpty ? "empty" : "ok" });
-      if (isEmpty) emptyCount += 1;
-    }
-    warnings.push("No .env.example here, so missing keys cannot be detected.");
-  } else if (example) {
-    for (const key of example.keys) {
-      keys.push({ key, status: "missing" });
-      missingCount += 1;
-    }
-    warnings.push(`${exampleFile} exists but there is no .env file.`);
+    o.push("No .env.example here, so missing keys cannot be detected.");
+  } else if (l) {
+    for (const b of l.keys)
+      p.push({ key: b, status: "missing" }), w += 1;
+    o.push(`${a} exists but there is no .env file.`);
   }
-  const hasRealEnv = ACTIVE_NAMES.some((name) => parsedByName.has(name));
-  const envNotIgnored = hasRealEnv && !await isEnvGitIgnored(projectRoot, relativeDir);
+  const A = _e.some((b) => i.has(b)) && !await hn(e, t);
   return {
-    relativeDir,
-    label: relativeDir ? relativeDir.replace(/\\/g, "/") : "project root",
-    exampleFile,
-    activeFile,
-    files,
-    keys,
-    missingCount,
-    emptyCount,
-    extraCount,
-    envNotIgnored,
-    warnings
+    relativeDir: t,
+    label: t ? t.replace(/\\/g, "/") : "project root",
+    exampleFile: a,
+    activeFile: c,
+    files: r,
+    keys: p,
+    missingCount: w,
+    emptyCount: g,
+    extraCount: m,
+    envNotIgnored: A,
+    warnings: o
   };
 }
-async function auditProject(project) {
-  const warnings = [];
-  const base = {
-    projectId: project.id,
-    projectName: project.name,
-    projectPath: project.path,
-    pathExists: true,
+async function wn(e) {
+  const t = [], n = {
+    projectId: e.id,
+    projectName: e.name,
+    projectPath: e.path,
+    pathExists: !0,
     locations: [],
     missingCount: 0,
     emptyCount: 0,
     extraCount: 0,
-    hasEnvFiles: false,
-    envNotIgnored: false,
-    warnings
+    hasEnvFiles: !1,
+    envNotIgnored: !1,
+    warnings: t
   };
-  if (!project.path || !fs.existsSync(project.path)) {
-    return { ...base, pathExists: false };
-  }
-  let envDirs;
+  if (!e.path || !h.existsSync(e.path))
+    return { ...n, pathExists: !1 };
+  let o;
   try {
-    envDirs = await findEnvDirectories(project.path);
-  } catch (e) {
-    warnings.push(`Could not scan the project folder: ${e.message}`);
-    return base;
+    o = await fn(e.path);
+  } catch (r) {
+    return t.push(`Could not scan the project folder: ${r.message}`), n;
   }
-  if (envDirs.size === 0) return base;
-  const locations = [];
-  for (const [relativeDir, envFiles] of envDirs) {
-    locations.push(await auditLocation(project.path, relativeDir, envFiles));
-  }
-  locations.sort((a, b) => {
-    if (!a.relativeDir !== !b.relativeDir) return a.relativeDir ? 1 : -1;
-    const aScore = a.missingCount * 10 + a.emptyCount;
-    const bScore = b.missingCount * 10 + b.emptyCount;
-    if (aScore !== bScore) return bScore - aScore;
-    return a.label.localeCompare(b.label);
+  if (o.size === 0) return n;
+  const s = [];
+  for (const [r, a] of o)
+    s.push(await gn(e.path, r, a));
+  s.sort((r, a) => {
+    if (!r.relativeDir != !a.relativeDir) return r.relativeDir ? 1 : -1;
+    const c = r.missingCount * 10 + r.emptyCount, l = a.missingCount * 10 + a.emptyCount;
+    return c !== l ? l - c : r.label.localeCompare(a.label);
   });
-  const sum = (pick) => locations.reduce((total, location) => total + pick(location), 0);
+  const i = (r) => s.reduce((a, c) => a + r(c), 0);
   return {
-    ...base,
-    locations,
-    missingCount: sum((l) => l.missingCount),
-    emptyCount: sum((l) => l.emptyCount),
-    extraCount: sum((l) => l.extraCount),
-    hasEnvFiles: locations.some((l) => l.files.length > 0),
-    envNotIgnored: locations.some((l) => l.envNotIgnored),
-    warnings
+    ...n,
+    locations: s,
+    missingCount: i((r) => r.missingCount),
+    emptyCount: i((r) => r.emptyCount),
+    extraCount: i((r) => r.extraCount),
+    hasEnvFiles: s.some((r) => r.files.length > 0),
+    envNotIgnored: s.some((r) => r.envNotIgnored),
+    warnings: t
   };
 }
-async function auditEnvironments(projectId) {
-  const projects = getProjects().filter((p) => !projectId || p.id === projectId);
-  const reports = [];
-  for (const project of projects) {
-    reports.push(await auditProject(project));
-  }
-  reports.sort((a, b) => {
-    const aScore = a.missingCount * 10 + a.emptyCount;
-    const bScore = b.missingCount * 10 + b.emptyCount;
-    if (aScore !== bScore) return bScore - aScore;
-    return a.projectName.localeCompare(b.projectName);
-  });
-  return {
-    reports,
-    projectsWithIssues: reports.filter((r) => r.missingCount > 0 || r.emptyCount > 0).length,
-    totalMissing: reports.reduce((sum, r) => sum + r.missingCount, 0)
+async function yn(e) {
+  const t = L().filter((o) => !e || o.id === e), n = [];
+  for (const o of t)
+    n.push(await wn(o));
+  return n.sort((o, s) => {
+    const i = o.missingCount * 10 + o.emptyCount, r = s.missingCount * 10 + s.emptyCount;
+    return i !== r ? r - i : o.projectName.localeCompare(s.projectName);
+  }), {
+    reports: n,
+    projectsWithIssues: n.filter((o) => o.missingCount > 0 || o.emptyCount > 0).length,
+    totalMissing: n.reduce((o, s) => o + s.missingCount, 0)
   };
 }
-const LOCKFILES$1 = [
+const vn = [
   { file: "pnpm-lock.yaml", manager: "pnpm", prefix: "pnpm" },
   { file: "yarn.lock", manager: "yarn", prefix: "yarn" },
   { file: "bun.lockb", manager: "bun", prefix: "bun run" },
   { file: "bun.lock", manager: "bun", prefix: "bun run" },
   { file: "package-lock.json", manager: "npm", prefix: "npm run" }
 ];
-function detectRunner(projectPath) {
-  for (const { file, manager, prefix } of LOCKFILES$1) {
-    if (fs.existsSync(path.join(projectPath, file))) return { manager, prefix };
-  }
+function ot(e) {
+  for (const { file: t, manager: n, prefix: o } of vn)
+    if (h.existsSync(d.join(e, t))) return { manager: n, prefix: o };
   return { manager: "npm", prefix: "npm run" };
 }
-async function readScripts(projectPath) {
-  const packageJsonPath = path.join(projectPath, "package.json");
-  if (!fs.existsSync(packageJsonPath)) return null;
+async function st(e) {
+  const t = d.join(e, "package.json");
+  if (!h.existsSync(t)) return null;
   try {
-    const parsed = JSON.parse(await promises.readFile(packageJsonPath, "utf8"));
-    const scripts = parsed == null ? void 0 : parsed.scripts;
-    if (!scripts || typeof scripts !== "object") return null;
-    const clean = {};
-    for (const [name, body] of Object.entries(scripts)) {
-      if (typeof body === "string") clean[name] = body;
-    }
-    return clean;
+    const n = JSON.parse(await S.readFile(t, "utf8")), o = n == null ? void 0 : n.scripts;
+    if (!o || typeof o != "object") return null;
+    const s = {};
+    for (const [i, r] of Object.entries(o))
+      typeof r == "string" && (s[i] = r);
+    return s;
   } catch {
     return null;
   }
 }
-async function indexScripts() {
-  const projects = getProjects();
-  const scripts = [];
-  const warnings = [];
-  let projectsIndexed = 0;
-  for (const project of projects) {
-    const pathExists = Boolean(project.path) && fs.existsSync(project.path);
-    if (!pathExists) continue;
-    const found = await readScripts(project.path);
-    if (!found) continue;
-    projectsIndexed += 1;
-    const { manager, prefix } = detectRunner(project.path);
-    for (const [scriptName, scriptBody] of Object.entries(found)) {
-      scripts.push({
-        projectId: project.id,
-        projectName: project.name,
-        projectPath: project.path,
-        pathExists,
-        packageManager: manager,
-        scriptName,
-        scriptBody,
-        runCommand: `${prefix} ${scriptName}`
+async function bn() {
+  const e = L(), t = [], n = [];
+  let o = 0;
+  for (const r of e) {
+    const a = !!r.path && h.existsSync(r.path);
+    if (!a) continue;
+    const c = await st(r.path);
+    if (!c) continue;
+    o += 1;
+    const { manager: l, prefix: u } = ot(r.path);
+    for (const [p, w] of Object.entries(c))
+      t.push({
+        projectId: r.id,
+        projectName: r.name,
+        projectPath: r.path,
+        pathExists: a,
+        packageManager: l,
+        scriptName: p,
+        scriptBody: w,
+        runCommand: `${u} ${p}`
       });
-    }
   }
-  const nameCounts = /* @__PURE__ */ new Map();
-  for (const script of scripts) {
-    nameCounts.set(script.scriptName, (nameCounts.get(script.scriptName) ?? 0) + 1);
-  }
-  const sharedNames = [...nameCounts.entries()].filter(([, count]) => count > 1).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([name]) => name);
-  scripts.sort(
-    (a, b) => a.projectName.localeCompare(b.projectName) || a.scriptName.localeCompare(b.scriptName)
-  );
-  return { scripts, projectsIndexed, sharedNames, warnings };
+  const s = /* @__PURE__ */ new Map();
+  for (const r of t)
+    s.set(r.scriptName, (s.get(r.scriptName) ?? 0) + 1);
+  const i = [...s.entries()].filter(([, r]) => r > 1).sort((r, a) => a[1] - r[1] || r[0].localeCompare(a[0])).map(([r]) => r);
+  return t.sort(
+    (r, a) => r.projectName.localeCompare(a.projectName) || r.scriptName.localeCompare(a.scriptName)
+  ), { scripts: t, projectsIndexed: o, sharedNames: i, warnings: n };
 }
-async function runScript(projectId, scriptName) {
-  const project = getProjects().find((p) => p.id === projectId);
-  if (!project) throw new Error("Project not found.");
-  if (!fs.existsSync(project.path)) {
-    throw new Error(`The folder "${project.path}" no longer exists.`);
-  }
-  const scripts = await readScripts(project.path);
-  if (!scripts) {
-    throw new Error(`${project.name} has no package.json scripts.`);
-  }
-  if (!Object.prototype.hasOwnProperty.call(scripts, scriptName)) {
-    throw new Error(`"${scriptName}" is not a script in ${project.name}.`);
-  }
-  const { prefix } = detectRunner(project.path);
-  const command = `${prefix} ${scriptName}`;
-  const result = await runCommandInTerminal(command, project.path);
-  return { command, result };
+async function kn(e, t) {
+  const n = L().find((a) => a.id === e);
+  if (!n) throw new Error("Project not found.");
+  if (!h.existsSync(n.path))
+    throw new Error(`The folder "${n.path}" no longer exists.`);
+  const o = await st(n.path);
+  if (!o)
+    throw new Error(`${n.name} has no package.json scripts.`);
+  if (!Object.prototype.hasOwnProperty.call(o, t))
+    throw new Error(`"${t}" is not a script in ${n.name}.`);
+  const { prefix: s } = ot(n.path), i = `${s} ${t}`, r = await ne(i, n.path);
+  return { command: i, result: r };
 }
-const EMPTY = {
-  isRepository: false,
+const ae = {
+  isRepository: !1,
   modifiedFiles: 0,
   untrackedFiles: 0,
   ahead: 0,
   behind: 0
 };
-function looksLikeRepository(projectPath) {
-  return fs.existsSync(path.join(projectPath, ".git"));
+function Sn(e) {
+  return h.existsSync(d.join(e, ".git"));
 }
-async function git(projectPath, args, timeoutMs = 8e3) {
-  return capture("git", ["-C", projectPath, ...args], timeoutMs);
+async function X(e, t, n = 8e3) {
+  return M("git", ["-C", e, ...t], n);
 }
-async function readGitSnapshot(projectPath) {
-  if (!looksLikeRepository(projectPath)) return { ...EMPTY };
-  const snapshot = { ...EMPTY, isRepository: true };
+async function jn(e) {
+  if (!Sn(e)) return { ...ae };
+  const t = { ...ae, isRepository: !0 };
   try {
-    const { stdout, code } = await git(projectPath, ["rev-parse", "--abbrev-ref", "HEAD"]);
-    if (code === 0) {
-      const branch = stdout.trim();
-      if (branch) snapshot.branch = branch;
+    const { stdout: n, code: o } = await X(e, ["rev-parse", "--abbrev-ref", "HEAD"]);
+    if (o === 0) {
+      const s = n.trim();
+      s && (t.branch = s);
     }
   } catch {
-    return { ...EMPTY, isRepository: true };
+    return { ...ae, isRepository: !0 };
   }
   try {
-    const { stdout, code } = await git(projectPath, ["status", "--porcelain"]);
-    if (code === 0) {
-      for (const line of stdout.split(/\r?\n/)) {
-        if (!line.trim()) continue;
-        if (line.startsWith("??")) snapshot.untrackedFiles += 1;
-        else snapshot.modifiedFiles += 1;
-      }
-    }
+    const { stdout: n, code: o } = await X(e, ["status", "--porcelain"]);
+    if (o === 0)
+      for (const s of n.split(/\r?\n/))
+        s.trim() && (s.startsWith("??") ? t.untrackedFiles += 1 : t.modifiedFiles += 1);
   } catch {
   }
   try {
-    const { stdout, code } = await git(projectPath, [
+    const { stdout: n, code: o } = await X(e, [
       "rev-list",
       "--count",
       "--left-right",
       "@{upstream}...HEAD"
     ]);
-    if (code === 0) {
-      const [behind, ahead] = stdout.trim().split(/\s+/).map(Number);
-      if (Number.isFinite(behind)) snapshot.behind = behind;
-      if (Number.isFinite(ahead)) snapshot.ahead = ahead;
+    if (o === 0) {
+      const [s, i] = n.trim().split(/\s+/).map(Number);
+      Number.isFinite(s) && (t.behind = s), Number.isFinite(i) && (t.ahead = i);
     }
   } catch {
   }
   try {
-    const { stdout, code } = await git(projectPath, [
+    const { stdout: n, code: o } = await X(e, [
       "log",
       "-1",
       "--format=%ct%x00%s"
     ]);
-    if (code === 0 && stdout.trim()) {
-      const [seconds, message] = stdout.trim().split("\0");
-      const timestamp = Number(seconds);
-      if (Number.isFinite(timestamp)) snapshot.lastCommitAt = timestamp * 1e3;
-      if (message) snapshot.lastCommitMessage = message.trim();
+    if (o === 0 && n.trim()) {
+      const [s, i] = n.trim().split("\0"), r = Number(s);
+      Number.isFinite(r) && (t.lastCommitAt = r * 1e3), i && (t.lastCommitMessage = i.trim());
     }
   } catch {
   }
-  return snapshot;
+  return t;
 }
-async function isGitAvailable() {
+async function En() {
   try {
-    const { code } = await capture("git", ["--version"], 5e3);
-    return code === 0;
+    const { code: e } = await M("git", ["--version"], 5e3);
+    return e === 0;
   } catch {
-    return false;
+    return !1;
   }
 }
-function parseRepositoryName(url) {
-  const trimmed = url.trim();
-  const scpMatch = /^[A-Za-z0-9_.-]+@[A-Za-z0-9_.-]+:(.+)$/.exec(trimmed);
-  const pathPart = scpMatch ? scpMatch[1] : null;
-  let candidate = pathPart;
-  if (!candidate) {
+function rt(e) {
+  const t = e.trim(), n = /^[A-Za-z0-9_.-]+@[A-Za-z0-9_.-]+:(.+)$/.exec(t);
+  let s = n ? n[1] : null;
+  if (!s)
     try {
-      const parsed = new URL(trimmed);
-      if (!["https:", "http:", "ssh:", "git:"].includes(parsed.protocol)) return null;
-      candidate = parsed.pathname;
+      const a = new URL(t);
+      if (!["https:", "http:", "ssh:", "git:"].includes(a.protocol)) return null;
+      s = a.pathname;
     } catch {
       return null;
     }
-  }
-  const last = candidate.split("/").filter(Boolean).pop();
-  if (!last) return null;
-  const name = last.replace(/\.git$/i, "");
-  if (!/^[A-Za-z0-9._-]+$/.test(name) || name === "." || name === "..") return null;
-  return name;
+  const i = s.split("/").filter(Boolean).pop();
+  if (!i) return null;
+  const r = i.replace(/\.git$/i, "");
+  return !/^[A-Za-z0-9._-]+$/.test(r) || r === "." || r === ".." ? null : r;
 }
-function validateCloneUrl(url) {
-  const trimmed = url.trim();
-  if (!trimmed) return { valid: false, reason: "Enter a repository URL." };
-  if (/[\r\n\0]/.test(trimmed)) {
-    return { valid: false, reason: "That URL contains invalid characters." };
-  }
-  if (trimmed.startsWith("-")) {
-    return { valid: false, reason: "That URL is not valid." };
-  }
-  if (/^(ext|file|fd)::/i.test(trimmed) || trimmed.startsWith("file://")) {
-    return { valid: false, reason: "Only http(s) and ssh remotes can be cloned." };
-  }
-  const isScp = /^[A-Za-z0-9_.-]+@[A-Za-z0-9_.-]+:.+$/.test(trimmed);
-  if (!isScp) {
-    let parsed;
+function it(e) {
+  const t = e.trim();
+  if (!t) return { valid: !1, reason: "Enter a repository URL." };
+  if (/[\r\n\0]/.test(t))
+    return { valid: !1, reason: "That URL contains invalid characters." };
+  if (t.startsWith("-"))
+    return { valid: !1, reason: "That URL is not valid." };
+  if (/^(ext|file|fd)::/i.test(t) || t.startsWith("file://"))
+    return { valid: !1, reason: "Only http(s) and ssh remotes can be cloned." };
+  if (!/^[A-Za-z0-9_.-]+@[A-Za-z0-9_.-]+:.+$/.test(t)) {
+    let o;
     try {
-      parsed = new URL(trimmed);
+      o = new URL(t);
     } catch {
-      return { valid: false, reason: "That is not a valid repository URL." };
+      return { valid: !1, reason: "That is not a valid repository URL." };
     }
-    if (!["https:", "http:", "ssh:", "git:"].includes(parsed.protocol)) {
-      return { valid: false, reason: "Only http(s) and ssh remotes can be cloned." };
-    }
+    if (!["https:", "http:", "ssh:", "git:"].includes(o.protocol))
+      return { valid: !1, reason: "Only http(s) and ssh remotes can be cloned." };
   }
-  if (!parseRepositoryName(trimmed)) {
-    return { valid: false, reason: "Could not work out a folder name from that URL." };
-  }
-  return { valid: true };
+  return rt(t) ? { valid: !0 } : { valid: !1, reason: "Could not work out a folder name from that URL." };
 }
-const DAY_MS = 24 * 60 * 60 * 1e3;
-const STALE_COMMIT_DAYS = 90;
-const NEVER_OPENED_DAYS = 60;
-const LOCKFILES = [
+const xn = 24 * 60 * 60 * 1e3, Cn = 90, An = 60, $n = [
   "pnpm-lock.yaml",
   "yarn.lock",
   "bun.lockb",
   "bun.lock",
   "package-lock.json"
 ];
-function daysBetween(from, to) {
-  if (!from) return null;
-  return Math.floor((to - from) / DAY_MS);
+function Oe(e, t) {
+  return e ? Math.floor((t - e) / xn) : null;
 }
-async function readPackageState(projectPath) {
-  const packageJsonPath = path.join(projectPath, "package.json");
-  const hasPackageJson = fs.existsSync(packageJsonPath);
-  if (!hasPackageJson) {
-    return { hasPackageJson, hasNodeModules: false, lockfileName: void 0, lockfileDrift: false };
-  }
-  const hasNodeModules = fs.existsSync(path.join(projectPath, "node_modules"));
-  const lockfileName = LOCKFILES.find((name) => fs.existsSync(path.join(projectPath, name)));
-  let lockfileDrift = false;
-  if (lockfileName) {
+async function Pn(e) {
+  const t = d.join(e, "package.json"), n = h.existsSync(t);
+  if (!n)
+    return { hasPackageJson: n, hasNodeModules: !1, lockfileName: void 0, lockfileDrift: !1 };
+  const o = h.existsSync(d.join(e, "node_modules")), s = $n.find((r) => h.existsSync(d.join(e, r)));
+  let i = !1;
+  if (s)
     try {
-      const [pkgStat, lockStat] = await Promise.all([
-        promises.stat(packageJsonPath),
-        promises.stat(path.join(projectPath, lockfileName))
+      const [r, a] = await Promise.all([
+        S.stat(t),
+        S.stat(d.join(e, s))
       ]);
-      lockfileDrift = pkgStat.mtimeMs - lockStat.mtimeMs > 6e4;
+      i = r.mtimeMs - a.mtimeMs > 6e4;
     } catch {
-      lockfileDrift = false;
+      i = !1;
     }
-  }
-  return { hasPackageJson, hasNodeModules, lockfileName, lockfileDrift };
+  return { hasPackageJson: n, hasNodeModules: o, lockfileName: s, lockfileDrift: i };
 }
-function evaluate(entry) {
-  const issues = [];
-  let score = 0;
-  const add = (issue, weight) => {
-    issues.push(issue);
-    score += weight;
+function Nn(e) {
+  const t = [];
+  let n = 0;
+  const o = (s, i) => {
+    t.push(s), n += i;
   };
-  if (!entry.pathExists) {
-    add(
+  if (!e.pathExists)
+    return o(
       {
         kind: "path-missing",
         severity: "high",
@@ -2101,46 +1609,36 @@ function evaluate(entry) {
         detail: "The project folder no longer exists on disk."
       },
       100
+    ), { issues: t, score: n };
+  if (e.isRepository) {
+    const s = e.modifiedFiles + e.untrackedFiles;
+    s > 0 && o(
+      {
+        kind: "uncommitted-changes",
+        severity: s > 20 ? "high" : "medium",
+        label: `${s} uncommitted`,
+        detail: `${e.modifiedFiles} modified, ${e.untrackedFiles} untracked. This work only exists on this machine.`
+      },
+      Math.min(s, 30) + 10
+    ), e.ahead > 0 && o(
+      {
+        kind: "unpushed-commits",
+        severity: e.ahead > 5 ? "high" : "medium",
+        label: `${e.ahead} unpushed`,
+        detail: `${e.ahead} commit${e.ahead === 1 ? "" : "s"} on ${e.branch ?? "this branch"} have not been pushed.`
+      },
+      e.ahead * 3 + 10
+    ), e.daysSinceCommit !== null && e.daysSinceCommit >= Cn && o(
+      {
+        kind: "stale-commits",
+        severity: "low",
+        label: `${e.daysSinceCommit}d since commit`,
+        detail: `Last commit was ${e.daysSinceCommit} days ago.`
+      },
+      5
     );
-    return { issues, score };
-  }
-  if (entry.isRepository) {
-    const dirty = entry.modifiedFiles + entry.untrackedFiles;
-    if (dirty > 0) {
-      add(
-        {
-          kind: "uncommitted-changes",
-          severity: dirty > 20 ? "high" : "medium",
-          label: `${dirty} uncommitted`,
-          detail: `${entry.modifiedFiles} modified, ${entry.untrackedFiles} untracked. This work only exists on this machine.`
-        },
-        Math.min(dirty, 30) + 10
-      );
-    }
-    if (entry.ahead > 0) {
-      add(
-        {
-          kind: "unpushed-commits",
-          severity: entry.ahead > 5 ? "high" : "medium",
-          label: `${entry.ahead} unpushed`,
-          detail: `${entry.ahead} commit${entry.ahead === 1 ? "" : "s"} on ${entry.branch ?? "this branch"} have not been pushed.`
-        },
-        entry.ahead * 3 + 10
-      );
-    }
-    if (entry.daysSinceCommit !== null && entry.daysSinceCommit >= STALE_COMMIT_DAYS) {
-      add(
-        {
-          kind: "stale-commits",
-          severity: "low",
-          label: `${entry.daysSinceCommit}d since commit`,
-          detail: `Last commit was ${entry.daysSinceCommit} days ago.`
-        },
-        5
-      );
-    }
-  } else {
-    add(
+  } else
+    o(
       {
         kind: "no-git",
         severity: "low",
@@ -2149,72 +1647,54 @@ function evaluate(entry) {
       },
       4
     );
-  }
-  if (entry.hasPackageJson && !entry.hasNodeModules) {
-    add(
-      {
-        kind: "deps-not-installed",
-        severity: "medium",
-        label: "Deps not installed",
-        detail: "package.json exists but node_modules is missing. Install before running."
-      },
-      15
-    );
-  }
-  if (entry.lockfileDrift) {
-    add(
-      {
-        kind: "lockfile-drift",
-        severity: "medium",
-        label: "Lockfile behind",
-        detail: `package.json is newer than ${entry.lockfileName}. Dependencies may be out of sync.`
-      },
-      12
-    );
-  }
-  if (entry.daysSinceOpened === null) {
-    add(
-      {
-        kind: "never-opened",
-        severity: "low",
-        label: "Never opened",
-        detail: "This project has never been opened from Dev Launcher."
-      },
-      2
-    );
-  } else if (entry.daysSinceOpened >= NEVER_OPENED_DAYS) {
-    add(
-      {
-        kind: "never-opened",
-        severity: "low",
-        label: `${entry.daysSinceOpened}d untouched`,
-        detail: `Not opened from Dev Launcher in ${entry.daysSinceOpened} days.`
-      },
-      3
-    );
-  }
-  return { issues, score };
+  return e.hasPackageJson && !e.hasNodeModules && o(
+    {
+      kind: "deps-not-installed",
+      severity: "medium",
+      label: "Deps not installed",
+      detail: "package.json exists but node_modules is missing. Install before running."
+    },
+    15
+  ), e.lockfileDrift && o(
+    {
+      kind: "lockfile-drift",
+      severity: "medium",
+      label: "Lockfile behind",
+      detail: `package.json is newer than ${e.lockfileName}. Dependencies may be out of sync.`
+    },
+    12
+  ), e.daysSinceOpened === null ? o(
+    {
+      kind: "never-opened",
+      severity: "low",
+      label: "Never opened",
+      detail: "This project has never been opened from Dev Launcher."
+    },
+    2
+  ) : e.daysSinceOpened >= An && o(
+    {
+      kind: "never-opened",
+      severity: "low",
+      label: `${e.daysSinceOpened}d untouched`,
+      detail: `Not opened from Dev Launcher in ${e.daysSinceOpened} days.`
+    },
+    3
+  ), { issues: t, score: n };
 }
-async function scanRadar(onProgress) {
-  const projects = getProjects();
-  const warnings = [];
-  const entries = [];
-  const gitAvailable = await isGitAvailable();
-  if (!gitAvailable) {
-    warnings.push("git was not found on your PATH, so repository checks were skipped.");
-  }
-  const now = Date.now();
-  for (let i = 0; i < projects.length; i += 1) {
-    const project = projects[i];
-    onProgress == null ? void 0 : onProgress({
-      current: i + 1,
-      total: projects.length,
-      projectName: project.name,
-      done: false
+async function Dn(e) {
+  const t = L(), n = [], o = [], s = await En();
+  s || n.push("git was not found on your PATH, so repository checks were skipped.");
+  const i = Date.now();
+  for (let r = 0; r < t.length; r += 1) {
+    const a = t[r];
+    e == null || e({
+      current: r + 1,
+      total: t.length,
+      projectName: a.name,
+      done: !1
     });
-    const pathExists = Boolean(project.path) && fs.existsSync(project.path);
-    const git2 = pathExists && gitAvailable ? await readGitSnapshot(project.path) : {
-      isRepository: pathExists ? fs.existsSync(path.join(project.path, ".git")) : false,
+    const c = !!a.path && h.existsSync(a.path), l = c && s ? await jn(a.path) : {
+      isRepository: c ? h.existsSync(d.join(a.path, ".git")) : !1,
       modifiedFiles: 0,
       untrackedFiles: 0,
       ahead: 0,
@@ -2222,516 +1702,416 @@ async function scanRadar(onProgress) {
       branch: void 0,
       lastCommitAt: void 0,
       lastCommitMessage: void 0
-    };
-    const pkg = pathExists ? await readPackageState(project.path) : { hasPackageJson: false, hasNodeModules: false, lockfileName: void 0, lockfileDrift: false };
-    const base = {
-      projectId: project.id,
-      projectName: project.name,
-      projectPath: project.path,
-      pathExists,
-      isRepository: git2.isRepository,
-      branch: git2.branch,
-      modifiedFiles: git2.modifiedFiles,
-      untrackedFiles: git2.untrackedFiles,
-      ahead: git2.ahead,
-      behind: git2.behind,
-      lastCommitAt: git2.lastCommitAt,
-      lastCommitMessage: git2.lastCommitMessage,
-      daysSinceCommit: daysBetween(git2.lastCommitAt, now),
-      hasPackageJson: pkg.hasPackageJson,
-      hasNodeModules: pkg.hasNodeModules,
-      lockfileName: pkg.lockfileName,
-      lockfileDrift: pkg.lockfileDrift,
-      lastOpenedAt: project.lastOpenedAt,
-      daysSinceOpened: daysBetween(project.lastOpenedAt, now)
-    };
-    const { issues, score } = evaluate(base);
-    entries.push({ ...base, issues, score });
+    }, u = c ? await Pn(a.path) : { hasPackageJson: !1, hasNodeModules: !1, lockfileName: void 0, lockfileDrift: !1 }, p = {
+      projectId: a.id,
+      projectName: a.name,
+      projectPath: a.path,
+      pathExists: c,
+      isRepository: l.isRepository,
+      branch: l.branch,
+      modifiedFiles: l.modifiedFiles,
+      untrackedFiles: l.untrackedFiles,
+      ahead: l.ahead,
+      behind: l.behind,
+      lastCommitAt: l.lastCommitAt,
+      lastCommitMessage: l.lastCommitMessage,
+      daysSinceCommit: Oe(l.lastCommitAt, i),
+      hasPackageJson: u.hasPackageJson,
+      hasNodeModules: u.hasNodeModules,
+      lockfileName: u.lockfileName,
+      lockfileDrift: u.lockfileDrift,
+      lastOpenedAt: a.lastOpenedAt,
+      daysSinceOpened: Oe(a.lastOpenedAt, i)
+    }, { issues: w, score: g } = Nn(p);
+    o.push({ ...p, issues: w, score: g });
   }
-  onProgress == null ? void 0 : onProgress({ current: projects.length, total: projects.length, projectName: "", done: true });
-  entries.sort((a, b) => b.score - a.score || a.projectName.localeCompare(b.projectName));
-  return {
-    entries,
-    scannedAt: now,
-    healthyCount: entries.filter((e) => e.issues.length === 0).length,
-    needsAttentionCount: entries.filter(
-      (e) => e.issues.some((i) => i.severity === "high" || i.severity === "medium")
+  return e == null || e({ current: t.length, total: t.length, projectName: "", done: !0 }), o.sort((r, a) => a.score - r.score || r.projectName.localeCompare(a.projectName)), {
+    entries: o,
+    scannedAt: i,
+    healthyCount: o.filter((r) => r.issues.length === 0).length,
+    needsAttentionCount: o.filter(
+      (r) => r.issues.some((a) => a.severity === "high" || a.severity === "medium")
     ).length,
-    warnings
+    warnings: n
   };
 }
-const INSTALL_COMMANDS = [
+const Tn = [
   { lockfile: "pnpm-lock.yaml", command: "pnpm install" },
   { lockfile: "yarn.lock", command: "yarn install" },
   { lockfile: "bun.lockb", command: "bun install" },
   { lockfile: "bun.lock", command: "bun install" },
   { lockfile: "package-lock.json", command: "npm install" }
 ];
-function runClone(url, destination, onLine) {
-  return new Promise((resolve, reject) => {
-    var _a, _b;
-    const child = spawn(
+function Rn(e, t, n) {
+  return new Promise((o, s) => {
+    var c, l;
+    const i = we(
       "git",
-      ["clone", "--progress", "--", url, destination],
+      ["clone", "--progress", "--", e, t],
       {
-        shell: false,
-        windowsHide: true,
+        shell: !1,
+        windowsHide: !0,
         // Stop git from popping a GUI credential prompt that would hang us.
         env: { ...process.env, GIT_TERMINAL_PROMPT: "0", GCM_INTERACTIVE: "never" }
       }
     );
-    let stderrTail = "";
-    const consume = (chunk) => {
-      const text = chunk.toString();
-      stderrTail = (stderrTail + text).slice(-4e3);
-      for (const line of text.split(/\r?\n|\r/)) {
-        const trimmed = line.trim();
-        if (trimmed) onLine(trimmed);
+    let r = "";
+    const a = (u) => {
+      const p = u.toString();
+      r = (r + p).slice(-4e3);
+      for (const w of p.split(/\r?\n|\r/)) {
+        const g = w.trim();
+        g && n(g);
       }
     };
-    (_a = child.stdout) == null ? void 0 : _a.on("data", consume);
-    (_b = child.stderr) == null ? void 0 : _b.on("data", consume);
-    child.on("error", (err) => {
-      reject(
-        err.code === "ENOENT" ? new Error("git was not found on your PATH.") : err
+    (c = i.stdout) == null || c.on("data", a), (l = i.stderr) == null || l.on("data", a), i.on("error", (u) => {
+      s(
+        u.code === "ENOENT" ? new Error("git was not found on your PATH.") : u
       );
-    });
-    child.on("close", (code) => {
-      if (code === 0) {
-        resolve();
+    }), i.on("close", (u) => {
+      if (u === 0) {
+        o();
         return;
       }
-      const detail = stderrTail.trim().split(/\r?\n/).slice(-3).join(" ");
-      reject(new Error(detail || `git clone exited with code ${code}.`));
+      const p = r.trim().split(/\r?\n/).slice(-3).join(" ");
+      s(new Error(p || `git clone exited with code ${u}.`));
     });
   });
 }
-async function cloneAndSetup(request, onProgress) {
-  const warnings = [];
-  const report2 = (phase, message, detail, done = false) => onProgress == null ? void 0 : onProgress({ phase, message, detail, done });
-  report2("validating", "Checking the repository URL...");
-  const url = String(request.url ?? "").trim();
-  const urlCheck = validateCloneUrl(url);
-  if (!urlCheck.valid) {
-    throw new Error(urlCheck.reason ?? "That repository URL is not valid.");
-  }
-  const parent = path.resolve(String(request.destinationParent ?? "").trim());
-  if (!parent || !fs.existsSync(parent)) {
+async function In(e, t) {
+  const n = [], o = (m, v, A, b = !1) => t == null ? void 0 : t({ phase: m, message: v, detail: A, done: b });
+  o("validating", "Checking the repository URL...");
+  const s = String(e.url ?? "").trim(), i = it(s);
+  if (!i.valid)
+    throw new Error(i.reason ?? "That repository URL is not valid.");
+  const r = d.resolve(String(e.destinationParent ?? "").trim());
+  if (!r || !h.existsSync(r))
     throw new Error("Choose a destination folder that exists.");
-  }
-  if (!fs.statSync(parent).isDirectory()) {
+  if (!h.statSync(r).isDirectory())
     throw new Error("The destination must be a folder.");
-  }
-  const requestedName = String(request.folderName ?? "").trim();
-  const folderName = requestedName || parseRepositoryName(url);
-  if (!/^[A-Za-z0-9._-]+$/.test(folderName) || folderName === "." || folderName === "..") {
+  const c = String(e.folderName ?? "").trim() || rt(s);
+  if (!/^[A-Za-z0-9._-]+$/.test(c) || c === "." || c === "..")
     throw new Error("That folder name is not valid.");
-  }
-  const destination = path.join(parent, folderName);
-  if (!path.resolve(destination).startsWith(parent + path.sep)) {
+  const l = d.join(r, c);
+  if (!d.resolve(l).startsWith(r + d.sep))
     throw new Error("That folder name is not valid.");
-  }
-  if (fs.existsSync(destination)) {
-    throw new Error(`"${folderName}" already exists in that folder.`);
-  }
-  report2("cloning", `Cloning into ${folderName}...`);
+  if (h.existsSync(l))
+    throw new Error(`"${c}" already exists in that folder.`);
+  o("cloning", `Cloning into ${c}...`);
   try {
-    await runClone(url, destination, (line) => {
-      report2("cloning", `Cloning into ${folderName}...`, line);
+    await Rn(s, l, (m) => {
+      o("cloning", `Cloning into ${c}...`, m);
     });
-  } catch (e) {
+  } catch (m) {
     try {
-      if (fs.existsSync(destination)) {
-        await promises.rm(destination, { recursive: true, force: true, maxRetries: 2 });
-      }
+      h.existsSync(l) && await S.rm(l, { recursive: !0, force: !0, maxRetries: 2 });
     } catch {
-      warnings.push(`A partial clone may remain at ${destination}.`);
+      n.push(`A partial clone may remain at ${l}.`);
     }
-    throw e;
+    throw m;
   }
-  report2("detecting", "Detecting the project stack...");
-  let detected;
+  o("detecting", "Detecting the project stack...");
+  let u;
   try {
-    detected = detectProjectMeta(destination);
-  } catch (e) {
-    warnings.push(`Stack detection failed: ${e.message}`);
-    detected = {
-      name: folderName,
+    u = je(l);
+  } catch (m) {
+    n.push(`Stack detection failed: ${m.message}`), u = {
+      name: c,
       tags: [],
       commands: [],
       details: {
         languages: [],
         frameworks: [],
-        hasGit: true,
-        hasDocker: false
+        hasGit: !0,
+        hasDocker: !1
       }
     };
   }
-  report2("registering", "Adding it to your projects...");
-  const project = addProject({
-    name: detected.name || folderName,
-    path: destination,
-    description: detected.description,
-    tags: detected.tags,
-    isFavorite: false,
-    commands: detected.commands.map((c) => ({ ...c, id: c.id || generateId("cmd") }))
+  o("registering", "Adding it to your projects...");
+  const p = Se({
+    name: u.name || c,
+    path: l,
+    description: u.description,
+    tags: u.tags,
+    isFavorite: !1,
+    commands: u.commands.map((m) => ({ ...m, id: m.id || T("cmd") }))
   });
-  let installStarted = false;
-  if (request.installDependencies) {
-    const match = INSTALL_COMMANDS.find(
-      ({ lockfile }) => fs.existsSync(path.join(destination, lockfile))
+  let w = !1;
+  if (e.installDependencies) {
+    const m = Tn.find(
+      ({ lockfile: A }) => h.existsSync(d.join(l, A))
     );
-    const hasPackageJson = fs.existsSync(path.join(destination, "package.json"));
-    if (!hasPackageJson) {
-      warnings.push("No package.json found, so dependencies were not installed.");
-    } else {
-      const command = (match == null ? void 0 : match.command) ?? "npm install";
-      report2("installing", `Running ${command}...`);
+    if (!h.existsSync(d.join(l, "package.json")))
+      n.push("No package.json found, so dependencies were not installed.");
+    else {
+      const A = (m == null ? void 0 : m.command) ?? "npm install";
+      o("installing", `Running ${A}...`);
       try {
-        await runCommandInTerminal(command, destination);
-        installStarted = true;
-      } catch (e) {
-        warnings.push(`Could not start the install: ${e.message}`);
+        await ne(A, l), w = !0;
+      } catch (b) {
+        n.push(`Could not start the install: ${b.message}`);
       }
     }
   }
-  let editorOpened = false;
-  if (request.openInEditor) {
-    const editorKey = request.openInEditor;
-    if (!EDITOR_BINARIES[editorKey]) {
-      warnings.push(`Unknown editor "${editorKey}".`);
-    } else {
-      report2("opening", `Opening ${EDITOR_BINARIES[editorKey].label}...`);
+  let g = !1;
+  if (e.openInEditor) {
+    const m = e.openInEditor;
+    if (!G[m])
+      n.push(`Unknown editor "${m}".`);
+    else {
+      o("opening", `Opening ${G[m].label}...`);
       try {
-        await openInEditor(editorKey, destination, false);
-        editorOpened = true;
-      } catch (e) {
-        warnings.push(e.message);
+        await ke(m, l, !1), g = !0;
+      } catch (v) {
+        n.push(v.message);
       }
     }
   }
-  report2("done", `${project.name} is ready.`, void 0, true);
-  return {
-    projectId: project.id,
-    projectName: project.name,
-    projectPath: destination,
-    detectedTags: detected.tags,
-    commandCount: detected.commands.length,
-    installStarted,
-    editorOpened,
-    warnings
+  return o("done", `${p.name} is ready.`, void 0, !0), {
+    projectId: p.id,
+    projectName: p.name,
+    projectPath: l,
+    detectedTags: u.tags,
+    commandCount: u.commands.length,
+    installStarted: w,
+    editorOpened: g,
+    warnings: n
   };
 }
-const MAX_DELETE_TARGETS = 200;
-function broadcast(channel, payload) {
-  for (const win2 of BrowserWindow.getAllWindows()) {
-    if (!win2.isDestroyed()) win2.webContents.send(channel, payload);
-  }
+const Me = 200;
+function ce(e, t) {
+  for (const n of R.getAllWindows())
+    n.isDestroyed() || n.webContents.send(e, t);
 }
-function registerToolsIPC() {
-  ipcMain.handle(
+function _n() {
+  f.handle(
     "tools:scanDisk",
-    handler("tools:scanDisk", async (_unused, event) => {
-      return scanNodeModules((progress) => broadcast("tools:diskScanProgress", progress));
-    })
-  );
-  ipcMain.handle(
+    y("tools:scanDisk", async (e, t) => en((n) => ce("tools:diskScanProgress", n)))
+  ), f.handle(
     "tools:deleteModules",
-    handler("tools:deleteModules", (targets) => {
-      if (!Array.isArray(targets)) {
+    y("tools:deleteModules", (e) => {
+      if (!Array.isArray(e))
         throw new Error("Expected a list of folders to delete.");
-      }
-      if (targets.length === 0) {
+      if (e.length === 0)
         throw new Error("Nothing was selected.");
-      }
-      if (targets.length > MAX_DELETE_TARGETS) {
-        throw new Error(`Too many folders selected (limit ${MAX_DELETE_TARGETS}).`);
-      }
-      const paths = targets.map((t, i) => requireString(t, `Target ${i + 1}`));
-      return deleteNodeModules(paths);
+      if (e.length > Me)
+        throw new Error(`Too many folders selected (limit ${Me}).`);
+      const t = e.map((n, o) => C(n, `Target ${o + 1}`));
+      return tn(t);
     })
-  );
-  ipcMain.handle(
+  ), f.handle(
     "tools:listPorts",
-    handler("tools:listPorts", () => listPorts())
-  );
-  ipcMain.handle(
+    y("tools:listPorts", () => nt())
+  ), f.handle(
     "tools:killPort",
-    handler("tools:killPort", (pid, port) => {
-      if (typeof pid !== "number" || !Number.isInteger(pid) || pid <= 0) {
+    y("tools:killPort", (e, t) => {
+      if (typeof e != "number" || !Number.isInteger(e) || e <= 0)
         throw new Error("Invalid process id.");
-      }
-      if (typeof port !== "number" || !Number.isInteger(port) || port <= 0 || port > 65535) {
+      if (typeof t != "number" || !Number.isInteger(t) || t <= 0 || t > 65535)
         throw new Error("Invalid port number.");
-      }
-      return killByPid(pid, port);
+      return an(e, t);
     })
-  );
-  ipcMain.handle(
+  ), f.handle(
     "tools:auditEnv",
-    handler(
+    y(
       "tools:auditEnv",
-      (projectId) => auditEnvironments(
-        projectId === void 0 || projectId === null ? void 0 : requireId(projectId, "Project id")
+      (e) => yn(
+        e == null ? void 0 : j(e, "Project id")
       )
     )
-  );
-  ipcMain.handle(
+  ), f.handle(
     "tools:indexScripts",
-    handler("tools:indexScripts", () => indexScripts())
-  );
-  ipcMain.handle(
+    y("tools:indexScripts", () => bn())
+  ), f.handle(
     "tools:runScript",
-    handler("tools:runScript", async (projectId, scriptName) => {
-      const name = requireString(scriptName, "Script name");
-      if (!/^[A-Za-z0-9_.:\-/ ]{1,120}$/.test(name)) {
+    y("tools:runScript", async (e, t) => {
+      const n = C(t, "Script name");
+      if (!/^[A-Za-z0-9_.:\-/ ]{1,120}$/.test(n))
         throw new Error("That script name contains unsupported characters.");
-      }
-      const { command } = await runScript(requireId(projectId, "Project id"), name);
-      return { command };
+      const { command: o } = await kn(j(e, "Project id"), n);
+      return { command: o };
     })
-  );
-  ipcMain.handle(
+  ), f.handle(
     "tools:scanRadar",
-    handler(
+    y(
       "tools:scanRadar",
-      () => scanRadar((progress) => broadcast("tools:radarProgress", progress))
+      () => Dn((e) => ce("tools:radarProgress", e))
     )
-  );
-  ipcMain.handle(
+  ), f.handle(
     "tools:validateCloneUrl",
-    handler(
+    y(
       "tools:validateCloneUrl",
-      (url) => validateCloneUrl(typeof url === "string" ? url : "")
+      (e) => it(typeof e == "string" ? e : "")
     )
-  );
-  ipcMain.handle(
+  ), f.handle(
     "tools:clone",
-    handler("tools:clone", (request) => {
-      const input = requireObject(request, "Clone request");
-      return cloneAndSetup(
+    y("tools:clone", (e) => {
+      const t = D(e, "Clone request");
+      return In(
         {
-          url: requireString(input.url, "Repository URL"),
-          destinationParent: requireString(input.destinationParent, "Destination folder"),
-          folderName: typeof input.folderName === "string" && input.folderName.trim() ? input.folderName.trim() : void 0,
-          installDependencies: optionalBoolean(
-            input.installDependencies,
+          url: C(t.url, "Repository URL"),
+          destinationParent: C(t.destinationParent, "Destination folder"),
+          folderName: typeof t.folderName == "string" && t.folderName.trim() ? t.folderName.trim() : void 0,
+          installDependencies: _(
+            t.installDependencies,
             "Install dependencies flag"
           ),
-          openInEditor: typeof input.openInEditor === "string" && input.openInEditor ? input.openInEditor : void 0
+          openInEditor: typeof t.openInEditor == "string" && t.openInEditor ? t.openInEditor : void 0
         },
-        (progress) => broadcast("tools:cloneProgress", progress)
+        (n) => ce("tools:cloneProgress", n)
       );
     })
   );
 }
-const VALID_KINDS = ["editor", "command", "terminal", "folder", "url"];
-const MAX_STEPS = 30;
-function sanitizeSteps(raw) {
-  if (!Array.isArray(raw)) throw new Error("Steps must be an array.");
-  if (raw.length > MAX_STEPS) throw new Error(`A session can hold at most ${MAX_STEPS} steps.`);
-  return raw.map((entry, index) => {
-    const step = requireObject(entry, `Step ${index + 1}`);
-    const kind = String(step.kind ?? "");
-    if (!VALID_KINDS.includes(kind)) {
-      throw new Error(`Step ${index + 1} has an unknown type.`);
-    }
+const On = ["editor", "command", "terminal", "folder", "url"], Fe = 30;
+function Mn(e) {
+  if (!Array.isArray(e)) throw new Error("Steps must be an array.");
+  if (e.length > Fe) throw new Error(`A session can hold at most ${Fe} steps.`);
+  return e.map((t, n) => {
+    const o = D(t, `Step ${n + 1}`), s = String(o.kind ?? "");
+    if (!On.includes(s))
+      throw new Error(`Step ${n + 1} has an unknown type.`);
     return {
-      id: typeof step.id === "string" ? step.id : "",
-      kind,
-      target: typeof step.target === "string" ? step.target : "",
-      label: typeof step.label === "string" ? step.label : kind,
-      delayMs: Number(step.delayMs) || 0,
-      enabled: step.enabled !== false,
-      sortOrder: index
+      id: typeof o.id == "string" ? o.id : "",
+      kind: s,
+      target: typeof o.target == "string" ? o.target : "",
+      label: typeof o.label == "string" ? o.label : s,
+      delayMs: Number(o.delayMs) || 0,
+      enabled: o.enabled !== !1,
+      sortOrder: n
     };
   });
 }
-function registerSessionIPC() {
-  ipcMain.handle(
+function Fn() {
+  f.handle(
     "sessions:get",
-    handler(
+    y(
       "sessions:get",
-      (projectId) => getSession(requireId(projectId, "Project id"))
+      (e) => Z(j(e, "Project id"))
     )
-  );
-  ipcMain.handle(
+  ), f.handle(
     "sessions:getAll",
-    handler("sessions:getAll", () => {
-      pruneSessions();
-      return getAllSessions();
-    })
-  );
-  ipcMain.handle(
+    y("sessions:getAll", () => (It(), $t()))
+  ), f.handle(
     "sessions:update",
-    handler("sessions:update", (projectId, updates) => {
-      const patch = requireObject(updates, "Updates");
-      return updateSession(requireId(projectId, "Project id"), {
-        steps: patch.steps === void 0 ? void 0 : sanitizeSteps(patch.steps),
-        autoCapture: patch.autoCapture === void 0 ? void 0 : optionalBoolean(patch.autoCapture, "Auto capture")
+    y("sessions:update", (e, t) => {
+      const n = D(t, "Updates");
+      return Pt(j(e, "Project id"), {
+        steps: n.steps === void 0 ? void 0 : Mn(n.steps),
+        autoCapture: n.autoCapture === void 0 ? void 0 : _(n.autoCapture, "Auto capture")
       });
     })
-  );
-  ipcMain.handle(
+  ), f.handle(
     "sessions:clear",
-    handler(
+    y(
       "sessions:clear",
-      (projectId) => clearSession(requireId(projectId, "Project id"))
+      (e) => Nt(j(e, "Project id"))
     )
-  );
-  ipcMain.handle(
+  ), f.handle(
     "sessions:resume",
-    handler("sessions:resume", async (projectId) => {
-      const windows = BrowserWindow.getAllWindows();
-      return resumeSession(requireId(projectId, "Project id"), (progress) => {
-        for (const win2 of windows) {
-          if (!win2.isDestroyed()) win2.webContents.send("sessions:resumeProgress", progress);
-        }
+    y("sessions:resume", async (e) => {
+      const t = R.getAllWindows();
+      return Tt(j(e, "Project id"), (n) => {
+        for (const o of t)
+          o.isDestroyed() || o.webContents.send("sessions:resumeProgress", n);
       });
     })
   );
 }
-const OVERLAY_WIDTH = 720;
-const OVERLAY_HEIGHT = 460;
-const SHORTCUT_CANDIDATES = [
+const pe = 720, me = 460, Ln = [
   "CommandOrControl+Space",
   "Alt+Space",
   "CommandOrControl+Shift+Space"
 ];
-let overlayWindow = null;
-let registeredShortcut = null;
-function getRegisteredShortcut() {
-  return registeredShortcut;
+let E = null, W = null;
+function Vn() {
+  return W;
 }
-function buildOverlayWindow(preloadPath, devServerUrl, rendererDist) {
-  const win2 = new BrowserWindow({
-    width: OVERLAY_WIDTH,
-    height: OVERLAY_HEIGHT,
-    show: false,
-    frame: false,
-    transparent: true,
+function Wn(e, t, n) {
+  const o = new R({
+    width: pe,
+    height: me,
+    show: !1,
+    frame: !1,
+    transparent: !0,
     backgroundColor: "#00000000",
-    resizable: false,
-    movable: false,
-    minimizable: false,
-    maximizable: false,
-    fullscreenable: false,
-    skipTaskbar: true,
-    alwaysOnTop: true,
+    resizable: !1,
+    movable: !1,
+    minimizable: !1,
+    maximizable: !1,
+    fullscreenable: !1,
+    skipTaskbar: !0,
+    alwaysOnTop: !0,
     // Keep it out of the window list; it is a transient palette, not an app
     // window the user should be able to alt-tab into.
     webPreferences: {
-      preload: preloadPath,
-      contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: true
+      preload: e,
+      contextIsolation: !0,
+      nodeIntegration: !1,
+      sandbox: !0
     }
   });
-  win2.setAlwaysOnTop(true, "floating");
-  win2.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
-  if (devServerUrl) {
-    win2.loadURL(`${devServerUrl}#/overlay`);
-  } else if (rendererDist) {
-    win2.loadFile(path.join(rendererDist, "index.html"), { hash: "/overlay" });
-  }
-  win2.on("close", (event) => {
-    event.preventDefault();
-    win2.hide();
-  });
-  win2.on("blur", () => {
-    if (win2.isVisible()) win2.hide();
-  });
-  return win2;
+  return o.setAlwaysOnTop(!0, "floating"), o.setVisibleOnAllWorkspaces(!0, { visibleOnFullScreen: !0 }), t ? o.loadURL(`${t}#/overlay`) : n && o.loadFile(d.join(n, "index.html"), { hash: "/overlay" }), o.on("close", (s) => {
+    s.preventDefault(), o.hide();
+  }), o.on("blur", () => {
+    o.isVisible() && o.hide();
+  }), o;
 }
-function positionOnActiveDisplay(win2) {
-  const cursor = screen.getCursorScreenPoint();
-  const display = screen.getDisplayNearestPoint(cursor);
-  const { x, y, width, height } = display.workArea;
-  win2.setBounds({
-    x: Math.round(x + (width - OVERLAY_WIDTH) / 2),
+function Un(e) {
+  const t = Pe.getCursorScreenPoint(), n = Pe.getDisplayNearestPoint(t), { x: o, y: s, width: i, height: r } = n.workArea;
+  e.setBounds({
+    x: Math.round(o + (i - pe) / 2),
     // Slightly above centre reads better than dead centre.
-    y: Math.round(y + Math.max(60, (height - OVERLAY_HEIGHT) / 3)),
-    width: OVERLAY_WIDTH,
-    height: OVERLAY_HEIGHT
+    y: Math.round(s + Math.max(60, (r - me) / 3)),
+    width: pe,
+    height: me
   });
 }
-function showOverlay() {
-  if (!overlayWindow || overlayWindow.isDestroyed()) return;
-  positionOnActiveDisplay(overlayWindow);
-  overlayWindow.show();
-  overlayWindow.focus();
-  overlayWindow.webContents.send("overlay:shown");
+function Bn() {
+  !E || E.isDestroyed() || (Un(E), E.show(), E.focus(), E.webContents.send("overlay:shown"));
 }
-function hideOverlay() {
-  if (overlayWindow && !overlayWindow.isDestroyed() && overlayWindow.isVisible()) {
-    overlayWindow.hide();
-  }
+function fe() {
+  E && !E.isDestroyed() && E.isVisible() && E.hide();
 }
-function toggleOverlay() {
-  if (!overlayWindow || overlayWindow.isDestroyed()) return;
-  if (overlayWindow.isVisible()) hideOverlay();
-  else showOverlay();
+function Gn() {
+  !E || E.isDestroyed() || (E.isVisible() ? fe() : Bn());
 }
-function initOverlay(options) {
-  overlayWindow = buildOverlayWindow(
-    options.preloadPath,
-    options.devServerUrl,
-    options.rendererDist
+function zn(e) {
+  E = Wn(
+    e.preloadPath,
+    e.devServerUrl,
+    e.rendererDist
   );
-  for (const accelerator of SHORTCUT_CANDIDATES) {
+  for (const t of Ln)
     try {
-      if (globalShortcut.register(accelerator, toggleOverlay)) {
-        registeredShortcut = accelerator;
+      if (Be.register(t, Gn)) {
+        W = t;
         break;
       }
     } catch {
     }
-  }
-  if (!registeredShortcut) {
-    console.warn("Could not register a global launcher shortcut; all candidates were taken.");
-  } else {
-    console.log(`Global launcher bound to ${registeredShortcut}`);
-  }
-  return registeredShortcut;
+  return W ? console.log(`Global launcher bound to ${W}`) : console.warn("Could not register a global launcher shortcut; all candidates were taken."), W;
 }
-function teardownOverlay() {
-  globalShortcut.unregisterAll();
-  registeredShortcut = null;
-  if (overlayWindow && !overlayWindow.isDestroyed()) {
-    overlayWindow.removeAllListeners("close");
-    overlayWindow.destroy();
-  }
-  overlayWindow = null;
+function Hn() {
+  Be.unregisterAll(), W = null, E && !E.isDestroyed() && (E.removeAllListeners("close"), E.destroy()), E = null;
 }
-function registerOverlayIPC(getMainWindow) {
-  ipcMain.handle(
+function Jn(e) {
+  f.handle(
     "overlay:hide",
-    handler("overlay:hide", () => {
-      hideOverlay();
-      return true;
-    })
-  );
-  ipcMain.handle(
+    y("overlay:hide", () => (fe(), !0))
+  ), f.handle(
     "overlay:getShortcut",
-    handler("overlay:getShortcut", () => getRegisteredShortcut())
-  );
-  ipcMain.handle(
+    y("overlay:getShortcut", () => Vn())
+  ), f.handle(
     "overlay:focusMain",
-    handler("overlay:focusMain", (route) => {
-      hideOverlay();
-      const main = getMainWindow();
-      if (!main || main.isDestroyed()) return false;
-      if (main.isMinimized()) main.restore();
-      main.show();
-      main.focus();
-      if (typeof route === "string" && /^\/[A-Za-z0-9?=&/_-]*$/.test(route)) {
-        main.webContents.send("overlay:navigate", route);
-      }
-      return true;
+    y("overlay:focusMain", (t) => {
+      fe();
+      const n = e();
+      return !n || n.isDestroyed() ? !1 : (n.isMinimized() && n.restore(), n.show(), n.focus(), typeof t == "string" && /^\/[A-Za-z0-9?=&/_-]*$/.test(t) && n.webContents.send("overlay:navigate", t), !0);
     })
   );
 }
-const SCAFFOLD_TEMPLATES = [
+const qn = [
   {
     id: "react-vite",
     name: "React + Vite",
@@ -2793,70 +2173,64 @@ const SCAFFOLD_TEMPLATES = [
     cliCommand: "python -m venv venv"
   }
 ];
-function report(onProgress, step, message, percentage, logLine, done = false, error) {
-  onProgress({ step, message, percentage, logLine, done, error });
+function Zn(e, t, n, o, s, i = !1, r) {
+  e({ step: t, message: n, percentage: o, logLine: s, done: i, error: r });
 }
-function runCommand(cmd, args, cwd, onLine, env) {
-  return new Promise((resolve, reject) => {
-    var _a, _b;
-    const child = spawn(cmd, args, {
-      cwd,
+function J(e, t, n, o, s) {
+  return new Promise((i, r) => {
+    var u, p;
+    const a = we(e, t, {
+      cwd: n,
       shell: process.platform === "win32",
-      windowsHide: true,
-      env: { ...process.env, ...env }
+      windowsHide: !0,
+      env: { ...process.env, ...s }
     });
-    let stderr = "";
-    const consume = (chunk) => {
-      const text = chunk.toString();
-      stderr = (stderr + text).slice(-4e3);
-      for (const line of text.split(/\r?\n|\r/)) {
-        const trimmed = line.trim();
-        if (trimmed) onLine(trimmed);
+    let c = "";
+    const l = (w) => {
+      const g = w.toString();
+      c = (c + g).slice(-4e3);
+      for (const m of g.split(/\r?\n|\r/)) {
+        const v = m.trim();
+        v && o(v);
       }
     };
-    (_a = child.stdout) == null ? void 0 : _a.on("data", consume);
-    (_b = child.stderr) == null ? void 0 : _b.on("data", consume);
-    child.on("error", (err) => {
-      reject(
-        err.code === "ENOENT" ? new Error(`"${cmd}" was not found on PATH.`) : err
+    (u = a.stdout) == null || u.on("data", l), (p = a.stderr) == null || p.on("data", l), a.on("error", (w) => {
+      r(
+        w.code === "ENOENT" ? new Error(`"${e}" was not found on PATH.`) : w
       );
-    });
-    child.on("close", (code) => {
-      if (code === 0) {
-        resolve();
+    }), a.on("close", (w) => {
+      if (w === 0) {
+        i();
         return;
       }
-      const detail = stderr.trim().split(/\r?\n/).slice(-3).join(" ");
-      reject(new Error(detail || `"${cmd}" exited with code ${code}.`));
+      const g = c.trim().split(/\r?\n/).slice(-3).join(" ");
+      r(new Error(g || `"${e}" exited with code ${w}.`));
     });
   });
 }
-async function writeFile(filePath, content) {
-  await promises.mkdir(path.dirname(filePath), { recursive: true });
-  await promises.writeFile(filePath, content, "utf-8");
+async function k(e, t) {
+  await S.mkdir(d.dirname(e), { recursive: !0 }), await S.writeFile(e, t, "utf-8");
 }
-async function scaffoldReactVite(dir, name, variant) {
-  const isTs = variant === "ts";
-  const ext = isTs ? "tsx" : "jsx";
-  const tsxExt = isTs ? "tsx" : "jsx";
-  await writeFile(
-    path.join(dir, "package.json"),
+async function Kn(e, t, n) {
+  const o = n === "ts", s = o ? "tsx" : "jsx", i = o ? "tsx" : "jsx";
+  await k(
+    d.join(e, "package.json"),
     JSON.stringify(
       {
-        name,
+        name: t,
         version: "0.0.0",
-        private: true,
+        private: !0,
         scripts: {
           dev: "vite",
-          build: isTs ? "tsc && vite build" : "vite build",
+          build: o ? "tsc && vite build" : "vite build",
           preview: "vite preview",
-          ...isTs ? { typecheck: "tsc --noEmit" } : {}
+          ...o ? { typecheck: "tsc --noEmit" } : {}
         },
         dependencies: { react: "^18.2.0", "react-dom": "^18.2.0" },
         devDependencies: {
           "@vitejs/plugin-react": "^4.2.1",
           vite: "^5.2.0",
-          ...isTs ? {
+          ...o ? {
             typescript: "^5.2.2",
             "@types/react": "^18.2.66",
             "@types/react-dom": "^18.2.22"
@@ -2866,9 +2240,8 @@ async function scaffoldReactVite(dir, name, variant) {
       null,
       2
     )
-  );
-  await writeFile(
-    path.join(dir, "vite.config." + (isTs ? "ts" : "js")),
+  ), await k(
+    d.join(e, "vite.config." + (o ? "ts" : "js")),
     `import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
@@ -2876,68 +2249,62 @@ export default defineConfig({
   plugins: [react()],
 });
 `
-  );
-  if (isTs) {
-    await writeFile(
-      path.join(dir, "tsconfig.json"),
-      JSON.stringify(
-        {
-          compilerOptions: {
-            target: "ES2020",
-            useDefineForClassFields: true,
-            lib: ["ES2020", "DOM", "DOM.Iterable"],
-            module: "ESNext",
-            skipLibCheck: true,
-            moduleResolution: "bundler",
-            allowImportingTsExtensions: true,
-            resolveJsonModule: true,
-            isolatedModules: true,
-            noEmit: true,
-            jsx: "react-jsx",
-            strict: true
-          },
-          include: ["src"]
+  ), o && await k(
+    d.join(e, "tsconfig.json"),
+    JSON.stringify(
+      {
+        compilerOptions: {
+          target: "ES2020",
+          useDefineForClassFields: !0,
+          lib: ["ES2020", "DOM", "DOM.Iterable"],
+          module: "ESNext",
+          skipLibCheck: !0,
+          moduleResolution: "bundler",
+          allowImportingTsExtensions: !0,
+          resolveJsonModule: !0,
+          isolatedModules: !0,
+          noEmit: !0,
+          jsx: "react-jsx",
+          strict: !0
         },
-        null,
-        2
-      )
-    );
-  }
-  await writeFile(path.join(dir, "index.html"), `<!doctype html>
+        include: ["src"]
+      },
+      null,
+      2
+    )
+  ), await k(d.join(e, "index.html"), `<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>${name}</title>
+    <title>${t}</title>
   </head>
   <body>
     <div id="root"></div>
-    <script type="module" src="/src/main.${tsxExt}"><\/script>
+    <script type="module" src="/src/main.${i}"><\/script>
   </body>
 </html>
-`);
-  await writeFile(
-    path.join(dir, `src/main.${tsxExt}`),
+`), await k(
+    d.join(e, `src/main.${i}`),
     `import React from 'react';
 import ReactDOM from 'react-dom/client';
-import App from './App.${ext}';
+import App from './App.${s}';
 
-ReactDOM.createRoot(document.getElementById('root')${isTs ? "!" : ""}).render(
+ReactDOM.createRoot(document.getElementById('root')${o ? "!" : ""}).render(
   <React.StrictMode>
     <App />
   </React.StrictMode>
 );
 `
-  );
-  await writeFile(
-    path.join(dir, `src/App.${ext}`),
+  ), await k(
+    d.join(e, `src/App.${s}`),
     `import React from 'react';
 
-function App()${isTs ? ": JSX.Element" : ""} {
+function App()${o ? ": JSX.Element" : ""} {
   return (
     <div>
-      <h1>${name}</h1>
-      <p>Built with React + Vite${isTs ? " + TypeScript" : ""}</p>
+      <h1>${t}</h1>
+      <p>Built with React + Vite${o ? " + TypeScript" : ""}</p>
     </div>
   );
 }
@@ -2946,15 +2313,15 @@ export default App;
 `
   );
 }
-async function scaffoldNextjs(dir, name, variant) {
-  const isTs = variant === "ts";
-  await writeFile(
-    path.join(dir, "package.json"),
+async function Yn(e, t, n) {
+  const o = n === "ts";
+  await k(
+    d.join(e, "package.json"),
     JSON.stringify(
       {
-        name,
+        name: t,
         version: "0.1.0",
-        private: true,
+        private: !0,
         scripts: {
           dev: "next dev",
           build: "next build",
@@ -2967,7 +2334,7 @@ async function scaffoldNextjs(dir, name, variant) {
           "react-dom": "^18"
         },
         devDependencies: {
-          ...isTs ? {
+          ...o ? {
             typescript: "^5",
             "@types/node": "^20",
             "@types/react": "^18",
@@ -2980,62 +2347,57 @@ async function scaffoldNextjs(dir, name, variant) {
       null,
       2
     )
-  );
-  await writeFile(
-    path.join(dir, `next.config.${isTs ? "ts" : "js"}`),
+  ), await k(
+    d.join(e, `next.config.${o ? "ts" : "js"}`),
     `/** @type {import('next').NextConfig} */
 const nextConfig = {};
 
 export default nextConfig;
 `
-  );
-  if (isTs) {
-    await writeFile(
-      path.join(dir, "tsconfig.json"),
-      JSON.stringify(
-        {
-          compilerOptions: {
-            lib: ["dom", "dom.iterable", "esnext"],
-            allowJs: true,
-            skipLibCheck: true,
-            strict: true,
-            noEmit: true,
-            esModuleInterop: true,
-            module: "esnext",
-            moduleResolution: "bundler",
-            resolveJsonModule: true,
-            isolatedModules: true,
-            jsx: "preserve",
-            incremental: true,
-            plugins: [{ name: "next" }],
-            paths: { "@/*": ["./src/*"] }
-          },
-          include: ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
-          exclude: ["node_modules"]
+  ), o && await k(
+    d.join(e, "tsconfig.json"),
+    JSON.stringify(
+      {
+        compilerOptions: {
+          lib: ["dom", "dom.iterable", "esnext"],
+          allowJs: !0,
+          skipLibCheck: !0,
+          strict: !0,
+          noEmit: !0,
+          esModuleInterop: !0,
+          module: "esnext",
+          moduleResolution: "bundler",
+          resolveJsonModule: !0,
+          isolatedModules: !0,
+          jsx: "preserve",
+          incremental: !0,
+          plugins: [{ name: "next" }],
+          paths: { "@/*": ["./src/*"] }
         },
-        null,
-        2
-      )
-    );
-  }
-  const ext = isTs ? "tsx" : "jsx";
-  await writeFile(
-    path.join(dir, `src/app/page.${ext}`),
+        include: ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
+        exclude: ["node_modules"]
+      },
+      null,
+      2
+    )
+  );
+  const s = o ? "tsx" : "jsx";
+  await k(
+    d.join(e, `src/app/page.${s}`),
     `export default function Home() {
   return (
     <main>
-      <h1>${name}</h1>
+      <h1>${t}</h1>
       <p>Welcome to your Next.js app.</p>
     </main>
   );
 }
 `
-  );
-  await writeFile(
-    path.join(dir, `src/app/layout.${ext}`),
-    `export const metadata = { title: '${name}', description: 'Generated by Dev Launcher' };
+  ), await k(
+    d.join(e, `src/app/layout.${s}`),
+    `export const metadata = { title: '${t}', description: 'Generated by Dev Launcher' };
 
-export default function RootLayout({ children }${isTs ? ": { children: React.ReactNode }" : ""}) {
+export default function RootLayout({ children }${o ? ": { children: React.ReactNode }" : ""}) {
   return (
     <html lang="en">
       <body>{children}</body>
@@ -3045,19 +2407,19 @@ export default function RootLayout({ children }${isTs ? ": { children: React.Rea
 `
   );
 }
-async function scaffoldExpressApi(dir, name, variant) {
-  const isTs = variant === "ts";
-  await writeFile(
-    path.join(dir, "package.json"),
+async function Le(e, t, n) {
+  const o = n === "ts";
+  await k(
+    d.join(e, "package.json"),
     JSON.stringify(
       {
-        name,
+        name: t,
         version: "1.0.0",
-        private: true,
+        private: !0,
         scripts: {
-          dev: isTs ? "tsx watch src/index.ts" : "nodemon src/index.js",
-          start: isTs ? "node dist/index.js" : "node src/index.js",
-          build: isTs ? "tsc" : void 0,
+          dev: o ? "tsx watch src/index.ts" : "nodemon src/index.js",
+          start: o ? "node dist/index.js" : "node src/index.js",
+          build: o ? "tsc" : void 0,
           lint: "eslint src/"
         },
         dependencies: {
@@ -3066,7 +2428,7 @@ async function scaffoldExpressApi(dir, name, variant) {
           dotenv: "^16.3.1"
         },
         devDependencies: {
-          ...isTs ? {
+          ...o ? {
             typescript: "^5.2.2",
             tsx: "^4.7.0",
             "@types/express": "^4.17.21",
@@ -3078,34 +2440,31 @@ async function scaffoldExpressApi(dir, name, variant) {
       null,
       2
     )
-  );
-  if (isTs) {
-    await writeFile(
-      path.join(dir, "tsconfig.json"),
-      JSON.stringify(
-        {
-          compilerOptions: {
-            target: "ES2020",
-            module: "commonjs",
-            lib: ["ES2020"],
-            outDir: "./dist",
-            rootDir: "./src",
-            strict: true,
-            esModuleInterop: true,
-            skipLibCheck: true,
-            forceConsistentCasingInFileNames: true
-          },
-          include: ["src/**/*"],
-          exclude: ["node_modules", "dist"]
+  ), o && await k(
+    d.join(e, "tsconfig.json"),
+    JSON.stringify(
+      {
+        compilerOptions: {
+          target: "ES2020",
+          module: "commonjs",
+          lib: ["ES2020"],
+          outDir: "./dist",
+          rootDir: "./src",
+          strict: !0,
+          esModuleInterop: !0,
+          skipLibCheck: !0,
+          forceConsistentCasingInFileNames: !0
         },
-        null,
-        2
-      )
-    );
-  }
-  const indexFile = isTs ? "src/index.ts" : "src/index.js";
-  await writeFile(
-    path.join(dir, indexFile),
+        include: ["src/**/*"],
+        exclude: ["node_modules", "dist"]
+      },
+      null,
+      2
+    )
+  );
+  const s = o ? "src/index.ts" : "src/index.js";
+  await k(
+    d.join(e, s),
     `import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
@@ -3119,7 +2478,7 @@ app.use(cors());
 app.use(express.json());
 
 app.get('/', (_req, res) => {
-  res.json({ message: 'Welcome to ${name} API', status: 'ok' });
+  res.json({ message: 'Welcome to ${t} API', status: 'ok' });
 });
 
 app.get('/health', (_req, res) => {
@@ -3130,24 +2489,22 @@ app.listen(PORT, () => {
   console.log(\`Server running on http://localhost:\${PORT}\`);
 });
 `
-  );
-  await writeFile(path.join(dir, ".env"), `PORT=3001
+  ), await k(d.join(e, ".env"), `PORT=3001
 NODE_ENV=development
-`);
-  await writeFile(path.join(dir, ".env.example"), `PORT=3001
+`), await k(d.join(e, ".env.example"), `PORT=3001
 NODE_ENV=development
 `);
 }
-async function scaffoldPythonFastapi(dir, name) {
-  const snakeName = name.replace(/[^a-z0-9]+/gi, "_").toLowerCase();
-  await writeFile(
-    path.join(dir, "main.py"),
+async function Ve(e, t) {
+  const n = t.replace(/[^a-z0-9]+/gi, "_").toLowerCase();
+  await k(
+    d.join(e, "main.py"),
     `from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
 app = FastAPI(
-    title="${name}",
+    title="${t}",
     description="High-performance Python API built with FastAPI",
     version="0.1.0",
 )
@@ -3162,7 +2519,7 @@ app.add_middleware(
 
 @app.get("/")
 async def root():
-    return {"message": "Welcome to ${name} API", "status": "ok"}
+    return {"message": "Welcome to ${t} API", "status": "ok"}
 
 @app.get("/health")
 async def health():
@@ -3171,43 +2528,39 @@ async def health():
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
 `
-  );
-  await writeFile(
-    path.join(dir, "requirements.txt"),
+  ), await k(
+    d.join(e, "requirements.txt"),
     `fastapi>=0.109.0
 uvicorn[standard]>=0.27.0
 python-dotenv>=1.0.0
 `
-  );
-  await writeFile(
-    path.join(dir, "pyproject.toml"),
+  ), await k(
+    d.join(e, "pyproject.toml"),
     `[project]
-name = "${snakeName}"
+name = "${n}"
 version = "0.1.0"
-description = "${name} API"
+description = "${t} API"
 
 [tool.ruff]
 line-length = 100
 `
-  );
-  await writeFile(path.join(dir, ".env"), `APP_ENV=development
-`);
-  await writeFile(path.join(dir, ".env.example"), `APP_ENV=development
+  ), await k(d.join(e, ".env"), `APP_ENV=development
+`), await k(d.join(e, ".env.example"), `APP_ENV=development
 `);
 }
-async function scaffoldElectronApp(dir, name, variant) {
-  const isTs = variant === "ts";
-  await writeFile(
-    path.join(dir, "package.json"),
+async function We(e, t, n) {
+  const o = n === "ts";
+  await k(
+    d.join(e, "package.json"),
     JSON.stringify(
       {
-        name,
+        name: t,
         version: "0.0.0",
         main: "dist-electron/main.js",
-        private: true,
+        private: !0,
         scripts: {
           dev: "vite",
-          build: isTs ? "tsc && vite build" : "vite build",
+          build: o ? "tsc && vite build" : "vite build",
           preview: "vite preview",
           "electron:dev": 'concurrently "npm run dev" "electron ."'
         },
@@ -3219,7 +2572,7 @@ async function scaffoldElectronApp(dir, name, variant) {
           "react-dom": "^18.2.0",
           vite: "^5.2.0",
           "vite-plugin-electron": "^0.28.4",
-          ...isTs ? {
+          ...o ? {
             typescript: "^5.2.2",
             "@types/react": "^18.2.66",
             "@types/react-dom": "^18.2.22",
@@ -3231,10 +2584,9 @@ async function scaffoldElectronApp(dir, name, variant) {
       2
     )
   );
-  const ext = isTs ? "ts" : "js";
-  const reactExt = isTs ? "tsx" : "jsx";
-  await writeFile(
-    path.join(dir, `electron/main.${ext}`),
+  const s = o ? "ts" : "js", i = o ? "tsx" : "jsx";
+  await k(
+    d.join(e, `electron/main.${s}`),
     `import { app, BrowserWindow } from 'electron';
 import path from 'path';
 
@@ -3255,130 +2607,110 @@ function createWindow() {
 app.whenReady().then(createWindow);
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
 `
-  );
-  await writeFile(
-    path.join(dir, `src/main.${reactExt}`),
+  ), await k(
+    d.join(e, `src/main.${i}`),
     `import React from 'react';
 import ReactDOM from 'react-dom/client';
-import App from './App.${reactExt}';
+import App from './App.${i}';
 
-ReactDOM.createRoot(document.getElementById('root')${isTs ? "!" : ""}).render(<React.StrictMode><App /></React.StrictMode>);
+ReactDOM.createRoot(document.getElementById('root')${o ? "!" : ""}).render(<React.StrictMode><App /></React.StrictMode>);
 `
-  );
-  await writeFile(
-    path.join(dir, `src/App.${reactExt}`),
+  ), await k(
+    d.join(e, `src/App.${i}`),
     `import React from 'react';
 
-function App()${isTs ? ": JSX.Element" : ""} {
-  return <div><h1>${name}</h1><p>Electron + Vite + React${isTs ? " + TS" : ""}</p></div>;
+function App()${o ? ": JSX.Element" : ""} {
+  return <div><h1>${t}</h1><p>Electron + Vite + React${o ? " + TS" : ""}</p></div>;
 }
 
 export default App;
 `
-  );
-  await writeFile(path.join(dir, "index.html"), `<!doctype html>
+  ), await k(d.join(e, "index.html"), `<!doctype html>
 <html lang="en">
-  <head><meta charset="UTF-8" /><title>${name}</title></head>
-  <body><div id="root"></div><script type="module" src="/src/main.${reactExt}"><\/script></body>
+  <head><meta charset="UTF-8" /><title>${t}</title></head>
+  <body><div id="root"></div><script type="module" src="/src/main.${i}"><\/script></body>
 </html>
 `);
 }
-async function scaffoldWithCLIOrFallback(request, projectDir, onLine) {
-  const { templateId, name, variant } = request;
-  switch (templateId) {
+async function Xn(e, t, n) {
+  const { templateId: o, name: s, variant: i } = e;
+  switch (o) {
     case "react-vite": {
-      const template = variant === "ts" ? "react-ts" : "react";
+      const r = i === "ts" ? "react-ts" : "react";
       try {
-        const tmpName = "__vite_tmp__";
-        const tmpDir = path.join(path.dirname(projectDir), tmpName);
-        await runCommand(
+        const a = "__vite_tmp__", c = d.join(d.dirname(t), a);
+        await J(
           "npm",
-          ["create", "vite@latest", tmpName, "--", "--template", template],
-          path.dirname(projectDir),
-          onLine,
+          ["create", "vite@latest", a, "--", "--template", r],
+          d.dirname(t),
+          n,
           { npm_config_yes: "true" }
-        );
-        await promises.rename(tmpDir, projectDir);
+        ), await S.rename(c, t);
       } catch {
-        onLine("[fallback] CLI unavailable, generating local scaffold...");
-        await promises.mkdir(projectDir, { recursive: true });
-        await scaffoldReactVite(projectDir, name, variant);
+        n("[fallback] CLI unavailable, generating local scaffold..."), await S.mkdir(t, { recursive: !0 }), await Kn(t, s, i);
       }
       break;
     }
     case "nextjs": {
       try {
-        await runCommand(
+        await J(
           "npx",
           [
             "--yes",
             "create-next-app@latest",
-            name,
-            variant === "ts" ? "--typescript" : "--no-typescript",
+            s,
+            i === "ts" ? "--typescript" : "--no-typescript",
             "--eslint",
             "--app",
             "--no-tailwind",
             "--src-dir",
             "--no-import-alias"
           ],
-          path.dirname(projectDir),
-          onLine
+          d.dirname(t),
+          n
         );
       } catch {
-        onLine("[fallback] CLI unavailable, generating local scaffold...");
-        await promises.mkdir(projectDir, { recursive: true });
-        await scaffoldNextjs(projectDir, name, variant);
+        n("[fallback] CLI unavailable, generating local scaffold..."), await S.mkdir(t, { recursive: !0 }), await Yn(t, s, i);
       }
       break;
     }
     case "express-api": {
       try {
-        await promises.mkdir(projectDir, { recursive: true });
-        await runCommand("npm", ["init", "-y"], projectDir, onLine);
-        await scaffoldExpressApi(projectDir, name, variant);
+        await S.mkdir(t, { recursive: !0 }), await J("npm", ["init", "-y"], t, n), await Le(t, s, i);
       } catch {
-        onLine("[fallback] Generating local scaffold...");
-        await promises.mkdir(projectDir, { recursive: true });
-        await scaffoldExpressApi(projectDir, name, variant);
+        n("[fallback] Generating local scaffold..."), await S.mkdir(t, { recursive: !0 }), await Le(t, s, i);
       }
       break;
     }
     case "electron-app": {
       try {
-        await promises.mkdir(projectDir, { recursive: true });
-        await scaffoldElectronApp(projectDir, name, variant);
+        await S.mkdir(t, { recursive: !0 }), await We(t, s, i);
       } catch {
-        onLine("[fallback] Generating local scaffold...");
-        await promises.mkdir(projectDir, { recursive: true });
-        await scaffoldElectronApp(projectDir, name, variant);
+        n("[fallback] Generating local scaffold..."), await S.mkdir(t, { recursive: !0 }), await We(t, s, i);
       }
       break;
     }
     case "python-fastapi": {
       try {
-        await promises.mkdir(projectDir, { recursive: true });
-        await scaffoldPythonFastapi(projectDir, name);
+        await S.mkdir(t, { recursive: !0 }), await Ve(t, s);
       } catch {
-        onLine("[fallback] Generating local scaffold...");
-        await promises.mkdir(projectDir, { recursive: true });
-        await scaffoldPythonFastapi(projectDir, name);
+        n("[fallback] Generating local scaffold..."), await S.mkdir(t, { recursive: !0 }), await Ve(t, s);
       }
       break;
     }
     default:
-      throw new Error(`Unknown template id: "${templateId}".`);
+      throw new Error(`Unknown template id: "${o}".`);
   }
 }
-function getGitignore(templateId) {
-  const common = `# OS
+function Qn(e) {
+  const t = `# OS
 .DS_Store
 Thumbs.db
 
 # Editor
 .vscode/settings.json
 .idea/
-`;
-  const nodeIgnore = `
+`, n = `
 # Dependencies
 node_modules/
 
@@ -3396,8 +2728,7 @@ build/
 # Logs
 *.log
 npm-debug.log*
-`;
-  const pythonIgnore = `
+`, o = `
 # Python
 __pycache__/
 *.pyc
@@ -3412,191 +2743,149 @@ build/
 .env
 .env.local
 `;
-  if (templateId === "python-fastapi") return common + pythonIgnore;
-  return common + nodeIgnore;
+  return e === "python-fastapi" ? t + o : t + n;
 }
-function getTemplates() {
-  return SCAFFOLD_TEMPLATES;
+function eo() {
+  return qn;
 }
-const activeJobs = /* @__PURE__ */ new Map();
-async function generateProject(request, onProgress) {
-  const warnings = [];
-  const jobId = generateId("gen");
-  activeJobs.set(jobId, false);
-  const step = (s, msg, pct, line, done = false, error) => report(onProgress, s, msg, pct, line, done, error);
-  step("validating", "Validating project configuration…", 5);
-  const { name, targetPath, templateId, gitInit, installDeps } = request;
-  const safeName = (name ?? "").trim();
-  if (!safeName || !/^[A-Za-z0-9._-]+$/.test(safeName)) {
+const Ue = /* @__PURE__ */ new Map();
+async function to(e, t) {
+  const n = [], o = T("gen");
+  Ue.set(o, !1);
+  const s = (v, A, b, $, P = !1, x) => Zn(t, v, A, b, $, P, x);
+  s("validating", "Validating project configuration…", 5);
+  const { name: i, targetPath: r, templateId: a, gitInit: c, installDeps: l } = e, u = (i ?? "").trim();
+  if (!u || !/^[A-Za-z0-9._-]+$/.test(u))
     throw new Error("Project name must contain only letters, numbers, dots, dashes, underscores.");
-  }
-  const parent = path.resolve((targetPath ?? "").trim());
-  if (!parent || !fs.existsSync(parent)) {
+  const p = d.resolve((r ?? "").trim());
+  if (!p || !h.existsSync(p))
     throw new Error("Choose a destination folder that already exists on disk.");
-  }
-  if (!fs.statSync(parent).isDirectory()) {
+  if (!h.statSync(p).isDirectory())
     throw new Error("The destination path must be a folder.");
-  }
-  const projectDir = path.join(parent, safeName);
-  if (!path.resolve(projectDir).startsWith(parent + path.sep) && path.resolve(projectDir) !== parent) {
+  const w = d.join(p, u);
+  if (!d.resolve(w).startsWith(p + d.sep) && d.resolve(w) !== p)
     throw new Error("Invalid project name (path escape detected).");
-  }
-  if (fs.existsSync(projectDir)) {
-    throw new Error(`A folder named "${safeName}" already exists there.`);
-  }
-  step("validating", "All checks passed.", 10);
-  step("scaffolding", `Creating ${safeName} from template…`, 15);
+  if (h.existsSync(w))
+    throw new Error(`A folder named "${u}" already exists there.`);
+  s("validating", "All checks passed.", 10), s("scaffolding", `Creating ${u} from template…`, 15);
   try {
-    await scaffoldWithCLIOrFallback(request, projectDir, (line) => {
-      step("scaffolding", `Scaffolding ${safeName}…`, 30, line);
+    await Xn(e, w, (v) => {
+      s("scaffolding", `Scaffolding ${u}…`, 30, v);
     });
-  } catch (e) {
+  } catch (v) {
     try {
-      if (fs.existsSync(projectDir)) {
-        await promises.rm(projectDir, { recursive: true, force: true, maxRetries: 2 });
-      }
+      h.existsSync(w) && await S.rm(w, { recursive: !0, force: !0, maxRetries: 2 });
     } catch {
-      warnings.push(`A partial folder may remain at ${projectDir}.`);
+      n.push(`A partial folder may remain at ${w}.`);
     }
-    throw e;
+    throw v;
   }
   try {
-    const gitignorePath = path.join(projectDir, ".gitignore");
-    if (!fs.existsSync(gitignorePath)) {
-      await promises.writeFile(gitignorePath, getGitignore(templateId), "utf-8");
-    }
+    const v = d.join(w, ".gitignore");
+    h.existsSync(v) || await S.writeFile(v, Qn(a), "utf-8");
   } catch {
-    warnings.push("Could not write .gitignore.");
+    n.push("Could not write .gitignore.");
   }
-  step("scaffolding", "Scaffold complete.", 45);
-  if (gitInit) {
-    step("git", "Initialising git repository…", 50);
+  if (s("scaffolding", "Scaffold complete.", 45), c) {
+    s("git", "Initialising git repository…", 50);
     try {
-      await runCommand(
+      await J(
         "git",
         ["init"],
-        projectDir,
-        (line) => step("git", "Initialising git…", 55, line)
-      );
-      step("git", "Git repository ready.", 60);
-    } catch (e) {
-      warnings.push(`git init failed: ${e.message}`);
-      step("git", "git init skipped (git not found on PATH).", 60);
+        w,
+        (v) => s("git", "Initialising git…", 55, v)
+      ), s("git", "Git repository ready.", 60);
+    } catch (v) {
+      n.push(`git init failed: ${v.message}`), s("git", "git init skipped (git not found on PATH).", 60);
     }
   }
-  if (installDeps && templateId !== "python-fastapi") {
-    step("dependencies", "Installing dependencies…", 65);
-    const pm = request.packageManager ?? "npm";
-    const packageJsonPath = path.join(projectDir, "package.json");
-    if (fs.existsSync(packageJsonPath)) {
+  if (l && a !== "python-fastapi") {
+    s("dependencies", "Installing dependencies…", 65);
+    const v = e.packageManager ?? "npm", A = d.join(w, "package.json");
+    if (h.existsSync(A))
       try {
-        await runCommand(
-          pm,
+        await J(
+          v,
           ["install"],
-          projectDir,
-          (line) => step("dependencies", `Running ${pm} install…`, 75, line)
-        );
-        step("dependencies", "Dependencies installed.", 80);
-      } catch (e) {
-        warnings.push(`${pm} install failed: ${e.message}`);
-        step("dependencies", `${pm} install failed — open a terminal to install manually.`, 80);
+          w,
+          (b) => s("dependencies", `Running ${v} install…`, 75, b)
+        ), s("dependencies", "Dependencies installed.", 80);
+      } catch (b) {
+        n.push(`${v} install failed: ${b.message}`), s("dependencies", `${v} install failed — open a terminal to install manually.`, 80);
       }
-    } else {
-      warnings.push("No package.json found; skipping dependency install.");
-    }
+    else
+      n.push("No package.json found; skipping dependency install.");
   }
-  if (installDeps && templateId === "python-fastapi") {
-    step("dependencies", "For Python: activate your venv and run 'pip install -r requirements.txt'.", 80);
-    warnings.push("Python deps not auto-installed. Run: pip install -r requirements.txt");
-  }
-  step("indexing", "Detecting project metadata…", 85);
-  let detectedMeta;
+  l && a === "python-fastapi" && (s("dependencies", "For Python: activate your venv and run 'pip install -r requirements.txt'.", 80), n.push("Python deps not auto-installed. Run: pip install -r requirements.txt")), s("indexing", "Detecting project metadata…", 85);
+  let g;
   try {
-    detectedMeta = detectProjectMeta(projectDir);
-  } catch (e) {
-    warnings.push(`Metadata detection failed: ${e.message}`);
-    detectedMeta = {
-      name: safeName,
+    g = je(w);
+  } catch (v) {
+    n.push(`Metadata detection failed: ${v.message}`), g = {
+      name: u,
       tags: [],
       commands: [],
-      details: { languages: [], frameworks: [], hasGit: gitInit, hasDocker: false }
+      details: { languages: [], frameworks: [], hasGit: c, hasDocker: !1 }
     };
   }
-  step("indexing", "Registering in Dev Launcher…", 90);
-  const project = addProject({
-    name: detectedMeta.name || safeName,
-    path: projectDir,
-    description: detectedMeta.description,
-    tags: detectedMeta.tags,
-    isFavorite: false,
-    commands: detectedMeta.commands.map((c) => ({ ...c, id: c.id || generateId("cmd") }))
+  s("indexing", "Registering in Dev Launcher…", 90);
+  const m = Se({
+    name: g.name || u,
+    path: w,
+    description: g.description,
+    tags: g.tags,
+    isFavorite: !1,
+    commands: g.commands.map((v) => ({ ...v, id: v.id || T("cmd") }))
   });
-  step("complete", `${project.name} is ready!`, 100, void 0, true);
-  activeJobs.delete(jobId);
-  return {
-    success: true,
-    projectPath: projectDir,
-    projectId: project.id,
-    warnings,
-    project: { ...project, pathExists: true },
-    detectedMeta
+  return s("complete", `${m.name} is ready!`, 100, void 0, !0), Ue.delete(o), {
+    success: !0,
+    projectPath: w,
+    projectId: m.id,
+    warnings: n,
+    project: { ...m, pathExists: !0 },
+    detectedMeta: g
   };
 }
-function broadcastProgress(progress) {
-  for (const win2 of BrowserWindow.getAllWindows()) {
-    if (!win2.isDestroyed()) win2.webContents.send("generator:progress", progress);
-  }
+function no(e) {
+  for (const t of R.getAllWindows())
+    t.isDestroyed() || t.webContents.send("generator:progress", e);
 }
-function registerGeneratorIPC() {
-  ipcMain.handle(
+function oo() {
+  f.handle(
     "generator:getTemplates",
-    handler("generator:getTemplates", () => getTemplates())
-  );
-  ipcMain.handle(
+    y("generator:getTemplates", () => eo())
+  ), f.handle(
     "generator:create",
-    handler("generator:create", (request) => {
-      const input = requireObject(request, "Generator request");
-      const templateId = requireString(input.templateId, "Template ID");
-      const name = requireString(input.name, "Project name");
-      const targetPath = requireString(input.targetPath, "Target path");
-      const variant = typeof input.variant === "string" && ["ts", "js"].includes(input.variant) ? input.variant : "ts";
-      const gitInit = optionalBoolean(input.gitInit ?? true, "Git init flag");
-      const installDeps = optionalBoolean(input.installDeps ?? true, "Install deps flag");
-      const openEditor = optionalBoolean(input.openEditor ?? false, "Open editor flag");
-      const packageManager = typeof input.packageManager === "string" && ["npm", "pnpm", "yarn", "bun"].includes(input.packageManager) ? input.packageManager : "npm";
-      return generateProject(
+    y("generator:create", (e) => {
+      const t = D(e, "Generator request"), n = C(t.templateId, "Template ID"), o = C(t.name, "Project name"), s = C(t.targetPath, "Target path"), i = typeof t.variant == "string" && ["ts", "js"].includes(t.variant) ? t.variant : "ts", r = _(t.gitInit ?? !0, "Git init flag"), a = _(t.installDeps ?? !0, "Install deps flag"), c = _(t.openEditor ?? !1, "Open editor flag"), l = typeof t.packageManager == "string" && ["npm", "pnpm", "yarn", "bun"].includes(t.packageManager) ? t.packageManager : "npm";
+      return to(
         {
-          templateId,
-          name,
-          targetPath,
-          variant,
-          gitInit,
-          installDeps,
-          openEditor,
-          packageManager
+          templateId: n,
+          name: o,
+          targetPath: s,
+          variant: i,
+          gitInit: r,
+          installDeps: a,
+          openEditor: c,
+          packageManager: l
         },
-        broadcastProgress
+        no
       );
     })
-  );
-  ipcMain.handle(
+  ), f.handle(
     "generator:cancel",
-    handler("generator:cancel", () => {
-      return true;
-    })
+    y("generator:cancel", () => !0)
   );
 }
-const __dirname$1 = path.dirname(fileURLToPath(import.meta.url));
-process.env.APP_ROOT = path.join(__dirname$1, "..");
-const VITE_DEV_SERVER_URL = process.env["VITE_DEV_SERVER_URL"];
-const MAIN_DIST = path.join(process.env.APP_ROOT, "dist-electron");
-const RENDERER_DIST = path.join(process.env.APP_ROOT, "dist");
-process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL ? path.join(process.env.APP_ROOT, "public") : RENDERER_DIST;
-let win;
-app.setName("Dev Launcher");
-function createWindow() {
-  win = new BrowserWindow({
-    icon: path.join(process.env.VITE_PUBLIC, "app-icon.png"),
+const Ce = d.dirname(ct(import.meta.url));
+process.env.APP_ROOT = d.join(Ce, "..");
+const U = process.env.VITE_DEV_SERVER_URL, po = d.join(process.env.APP_ROOT, "dist-electron"), Ae = d.join(process.env.APP_ROOT, "dist");
+process.env.VITE_PUBLIC = U ? d.join(process.env.APP_ROOT, "public") : Ae;
+let I;
+O.setName("Dev Launcher");
+function at() {
+  I = new R({
+    icon: d.join(process.env.VITE_PUBLIC, "app-icon.png"),
     title: "Dev Launcher",
     width: 1280,
     height: 820,
@@ -3604,65 +2893,34 @@ function createWindow() {
     minHeight: 600,
     backgroundColor: "#181818",
     webPreferences: {
-      preload: path.join(__dirname$1, "preload.mjs"),
+      preload: d.join(Ce, "preload.mjs"),
       // Set explicitly rather than relying on Electron's defaults, so a major
       // version bump can never silently weaken the sandbox.
-      contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: true,
-      webviewTag: false
+      contextIsolation: !0,
+      nodeIntegration: !1,
+      sandbox: !0,
+      webviewTag: !1
     }
-  });
-  win.webContents.setWindowOpenHandler(({ url }) => {
-    if (url.startsWith("http://") || url.startsWith("https://")) {
-      shell.openExternal(url);
-    }
-    return { action: "deny" };
-  });
-  win.webContents.on("will-navigate", (event, url) => {
-    const isDevServer = VITE_DEV_SERVER_URL && url.startsWith(VITE_DEV_SERVER_URL);
-    if (!isDevServer && !url.startsWith("file://")) {
-      event.preventDefault();
-      if (url.startsWith("http://") || url.startsWith("https://")) {
-        shell.openExternal(url);
-      }
-    }
-  });
-  if (VITE_DEV_SERVER_URL) {
-    win.loadURL(VITE_DEV_SERVER_URL);
-  } else {
-    win.loadFile(path.join(RENDERER_DIST, "index.html"));
-  }
+  }), I.webContents.setWindowOpenHandler(({ url: e }) => ((e.startsWith("http://") || e.startsWith("https://")) && de.openExternal(e), { action: "deny" })), I.webContents.on("will-navigate", (e, t) => {
+    !(U && t.startsWith(U)) && !t.startsWith("file://") && (e.preventDefault(), (t.startsWith("http://") || t.startsWith("https://")) && de.openExternal(t));
+  }), U ? I.loadURL(U) : I.loadFile(d.join(Ae, "index.html"));
 }
-app.on("window-all-closed", () => {
-  if (process.platform !== "darwin") {
-    app.quit();
-    win = null;
-  }
+O.on("window-all-closed", () => {
+  process.platform !== "darwin" && (O.quit(), I = null);
 });
-app.on("will-quit", teardownOverlay);
-app.on("activate", () => {
-  if (BrowserWindow.getAllWindows().length === 0) {
-    createWindow();
-  }
+O.on("will-quit", Hn);
+O.on("activate", () => {
+  R.getAllWindows().length === 0 && at();
 });
-app.whenReady().then(() => {
-  registerProjectIPC();
-  registerGroupIPC();
-  registerDialogIPC();
-  registerToolsIPC();
-  registerSessionIPC();
-  registerOverlayIPC(() => win);
-  registerGeneratorIPC();
-  createWindow();
-  initOverlay({
-    preloadPath: path.join(__dirname$1, "preload.mjs"),
-    devServerUrl: VITE_DEV_SERVER_URL,
-    rendererDist: RENDERER_DIST
+O.whenReady().then(() => {
+  zt(), Yt(), Xt(), _n(), Fn(), Jn(() => I), oo(), at(), zn({
+    preloadPath: d.join(Ce, "preload.mjs"),
+    devServerUrl: U,
+    rendererDist: Ae
   });
 });
 export {
-  MAIN_DIST,
-  RENDERER_DIST,
-  VITE_DEV_SERVER_URL
+  po as MAIN_DIST,
+  Ae as RENDERER_DIST,
+  U as VITE_DEV_SERVER_URL
 };

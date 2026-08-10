@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <!-- Background -->
+  <rect width="256" height="256" fill="#181818"/>
+  
+  <!-- Outer glow ring -->
+  <circle cx="128" cy="128" r="108" fill="none" stroke="#d97757" stroke-width="2" opacity="0.3"/>
+  
+  <!-- Inner circle background -->
+  <circle cx="128" cy="128" r="96" fill="#1f1f1f"/>
+  
+  <!-- Terminal prompt symbol: > -->
+  <path d="M72 88 L108 128 L72 168" fill="none" stroke="#d97757" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+  
+  <!-- Underscore / cursor -->
+  <rect x="116" y="156" width="68" height="12" rx="6" fill="#d97757" opacity="0.9"/>
+  
+  <!-- Subtle glow effect -->
+  <circle cx="128" cy="128" r="96" fill="none" stroke="#d97757" stroke-width="1" opacity="0.15"/>
+  
+  <!-- Top accent dots -->
+  <circle cx="116" cy="72" r="5" fill="#d97757" opacity="0.6"/>
+  <circle cx="132" cy="72" r="5" fill="#d97757" opacity="0.4"/>
+  <circle cx="148" cy="72" r="5" fill="#d97757" opacity="0.2"/>
+</svg>

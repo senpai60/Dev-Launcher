@@ -34,9 +34,13 @@ process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL
 
 let win: BrowserWindow | null;
 
+// Set the application name — this is what shows in Task Manager / Dock.
+app.setName("Dev Launcher");
+
 function createWindow() {
   win = new BrowserWindow({
-    icon: path.join(process.env.VITE_PUBLIC, "electron-vite.svg"),
+    icon: path.join(process.env.VITE_PUBLIC, "app-icon.png"),
+    title: "Dev Launcher",
     width: 1280,
     height: 820,
     minWidth: 940,

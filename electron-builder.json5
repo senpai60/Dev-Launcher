@@ -1,12 +1,14 @@
 // @see - https://www.electron.build/configuration/configuration
 {
   "$schema": "https://raw.githubusercontent.com/electron-userland/electron-builder/master/packages/app-builder-lib/scheme.json",
-  "appId": "YourAppID",
+  "appId": "com.devlauncher.app",
   "asar": true,
-  "productName": "YourAppName",
+  "productName": "Dev Launcher",
+  "copyright": "Copyright © 2024 Dev Launcher",
   "directories": {
     "output": "release/${version}"
   },
+  "icon": "public/app-icon.png",
   "files": [
     "dist",
     "dist-electron"
@@ -18,12 +20,15 @@
     "artifactName": "${productName}-Mac-${version}-Installer.${ext}"
   },
   "win": {
+    "icon": "public/icon.ico",
     "target": [
       {
         "target": "nsis",
-        "arch": [
-          "x64"
-        ]
+        "arch": ["x64"]
+      },
+      {
+        "target": "dir",
+        "arch": ["x64"]
       }
     ],
     "artifactName": "${productName}-Windows-${version}-Setup.${ext}"

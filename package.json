@@ -1,11 +1,15 @@
 {
   "name": "dev-launcher",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
+  "description": "A powerful developer workspace launcher for managing projects, commands, and tools.",
+  "author": "Dev Launcher",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build && electron-builder",
+    "build:win": "tsc && vite build && electron-builder --win --x64",
+    "build:dir": "tsc && vite build && electron-builder --win dir",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview"
   },
@@ -21,6 +25,7 @@
     "@typescript-eslint/eslint-plugin": "^7.1.1",
     "@typescript-eslint/parser": "^7.1.1",
     "@vitejs/plugin-react": "^4.2.1",
+    "canvas": "^3.2.3",
     "electron": "^30.0.1",
     "electron-builder": "^24.13.3",
     "eslint": "^8.57.0",
